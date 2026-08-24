@@ -46,3 +46,23 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Local tool configuration accidentally created inside the workspace
+~/
+
+# Python caches and environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+
+# Additional editor and OS files
+.vscode/
+Thumbs.db

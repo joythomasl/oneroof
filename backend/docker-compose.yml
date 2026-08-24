@@ -1,0 +1,44 @@
+# Person 5A — Docker Compose
+# Only includes services required by Person 5A (PostGIS + API).
+# Person 5B will add MinIO, Redis, etc. during merge.
+
+services:
+  # ── PostgreSQL + PostGIS ──────────────────────────────────
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: oneroof-postgis
+    environment:
+      POSTGRES_DB: oneroof
+      POSTGRES_USER: oneroof
+      POSTGRES_PASSWORD: oneroof
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oneroof -d oneroof"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI (Person 5A) ───────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oneroof-api
+    environment:
+      DATABASE_URL: postgresql://oneroof:oneroof@postgis:5432/oneroof
+      DEDUPE_RADIUS_METERS: 500
+      DEDUPE_TIME_WINDOW_MINUTES: 30
+      DEBUG: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
