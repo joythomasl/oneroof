@@ -1,0 +1,22 @@
+# ONE ROOF - Backend dependencies
+# Person 5B scope: API, media storage, Redis, WebSockets, auth.
+# Person 5A should append their DB stack (sqlalchemy/geoalchemy2/
+# asyncpg/alembic) below the marker at the bottom.
+
+fastapi==0.135.1
+uvicorn[standard]==0.41.0
+pydantic==2.12.5
+pydantic-settings==2.15.0
+python-multipart==0.0.32
+python-dotenv==1.2.3
+
+# Media storage (MinIO via S3-compatible API)
+boto3==1.43.78
+
+# Redis pub/sub + OTP storage
+redis==8.1.0
+
+# JWT issuing / verification
+PyJWT==2.10.1
+
+# --- Person 5A: add database dependencies below this line ---
