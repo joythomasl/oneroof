@@ -31,6 +31,9 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_p2p_connection: ^3.0.3
+  # Already pulled in transitively by flutter_p2p_connection; declared directly
+  # because we import it ourselves for message and device ids.
+  uuid: ^4.5.1
 
 dev_dependencies:
   flutter_test:
