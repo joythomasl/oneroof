@@ -12,6 +12,7 @@ The photo binary goes to MinIO; only metadata is kept by the API.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from tempfile import SpooledTemporaryFile
 from typing import List, Optional
 from uuid import UUID, uuid4
@@ -96,11 +97,16 @@ async def _read_with_limit(upload: UploadFile, limit_bytes: int) -> tuple:
 )
 async def upload_photo(
     file: UploadFile = File(..., description="The image to upload."),
-    incident_id: Optional[UUID] = Form(
+    incident_id: Optional[int] = Form(
         default=None, description="Incident this photo belongs to (optional)."
     ),
     caption: Optional[str] = Form(
         default=None, max_length=280, description="Short description (optional)."
+    ),
+    latitude: Optional[float] = Form(default=None, ge=-90, le=90),
+    longitude: Optional[float] = Form(default=None, ge=-180, le=180),
+    captured_at: Optional[datetime] = Form(
+        default=None, description="Original device capture time in UTC."
     ),
     user: Optional[User] = Depends(get_optional_user),
 ) -> PhotoOut:
@@ -150,6 +156,9 @@ async def upload_photo(
         size_bytes=size,
         status=PhotoStatus.PENDING,
         caption=caption,
+        latitude=latitude,
+        longitude=longitude,
+        captured_at=captured_at,
         uploaded_by=user.id if user else None,
     )
     await photo_store.add(photo)
@@ -190,6 +199,9 @@ async def upload_photo(
         size_bytes=photo.size_bytes,
         status=photo.status,
         caption=photo.caption,
+        latitude=photo.latitude,
+        longitude=photo.longitude,
+        captured_at=photo.captured_at,
         uploaded_by=photo.uploaded_by,
         uploaded_at=photo.uploaded_at,
     )
@@ -203,7 +215,7 @@ async def upload_photo(
     summary="List uploaded photos",
 )
 async def list_photos(
-    incident_id: Optional[UUID] = Query(
+    incident_id: Optional[int] = Query(
         default=None, description="Filter to one incident."
     ),
 ) -> List[PhotoOut]:

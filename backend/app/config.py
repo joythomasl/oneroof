@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,6 +25,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://oneroof:oneroof@localhost:5432/oneroof"
     DEDUPE_RADIUS_METERS: float = 500.0
     DEDUPE_TIME_WINDOW_MINUTES: int = 30
+    CLOSURE_PHOTO_MAX_DISTANCE_METERS: float = 250.0
 
     otp_expiry_seconds: int = 300
     otp_length: int = 6
@@ -44,6 +46,12 @@ class Settings(BaseSettings):
     redis_incident_channel: str = "incident_updates"
     max_upload_size_mb: int = 10
 
+    # Supabase project metadata. Database access continues through DATABASE_URL
+    # so hosted and self-hosted projects use the same repositories.
+    supabase_url: Optional[str] = None
+    supabase_anon_key: Optional[str] = None
+    supabase_service_role_key: Optional[str] = None
+
     @property
     def is_development(self) -> bool:
         return self.environment.lower() in {"development", "dev", "local"}
@@ -51,6 +59,10 @@ class Settings(BaseSettings):
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024
+
+    @property
+    def supabase_configured(self) -> bool:
+        return bool(self.supabase_url and self.supabase_anon_key)
 
     @property
     def APP_NAME(self) -> str:

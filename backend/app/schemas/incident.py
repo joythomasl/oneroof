@@ -17,6 +17,7 @@ class IncidentCreate(BaseModel):
     """Schema for creating a new incident."""
 
     reporter_id: Optional[int] = None
+    area_id: Optional[int] = None
     incident_type: IncidentType
     severity: Severity
     title: str = Field(..., min_length=1, max_length=255)
@@ -53,6 +54,7 @@ class IncidentUpdate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     status: Optional[IncidentStatus] = None
+    area_id: Optional[int] = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -79,6 +81,7 @@ class IncidentResponse(BaseModel):
 
     id: int
     reporter_id: Optional[int] = None
+    area_id: Optional[int] = None
     incident_type: IncidentType
     severity: Severity
     title: str
@@ -91,6 +94,12 @@ class IncidentResponse(BaseModel):
     external_event_id: Optional[str] = None
     source_device_id: Optional[str] = None
     duplicate_of_id: Optional[int] = None
+    verification_note: Optional[str] = None
+    verified_by: Optional[str] = None
+    verified_at: Optional[datetime] = None
+    location_flagged: bool = False
+    location_flag_reason: Optional[str] = None
+    closure_photo_distance_meters: Optional[float] = None
 
     model_config = {"from_attributes": True}
 

@@ -12,7 +12,7 @@ Endpoints:
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -20,6 +20,7 @@ from geoalchemy2.elements import WKTElement
 
 from app.database import get_db
 from app.models.incident import Incident, IncidentType, Severity, IncidentStatus
+from app.models.events import EventType
 from app.schemas.incident import (
     IncidentCreate,
     IncidentUpdate,
@@ -30,6 +31,7 @@ from app.schemas.incident import (
 )
 from app.services.postgis_service import find_incidents_nearby
 from app.services.dedupe_service import check_duplicate, link_duplicate
+from app.services.redis_service import redis_service
 
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
 
@@ -46,7 +48,11 @@ def _make_location(longitude: float, latitude: float) -> WKTElement:
 
 
 @router.post("/", response_model=IncidentResponse, status_code=201)
-def create_incident(payload: IncidentCreate, db: Session = Depends(get_db)):
+def create_incident(
+    payload: IncidentCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     Create a new incident report.
 
@@ -76,6 +82,7 @@ def create_incident(payload: IncidentCreate, db: Session = Depends(get_db)):
 
     incident = Incident(
         reporter_id=payload.reporter_id,
+        area_id=payload.area_id,
         incident_type=payload.incident_type,
         severity=payload.severity,
         title=payload.title,
@@ -118,6 +125,18 @@ def create_incident(payload: IncidentCreate, db: Session = Depends(get_db)):
     except SQLAlchemyError:
         db.rollback()
         raise
+    background_tasks.add_task(
+        redis_service.publish_event,
+        EventType.INCIDENT_CREATED.value,
+        str(incident.id),
+        {
+            "type": incident.incident_type.value,
+            "severity": incident.severity.value,
+            "status": incident.status.value,
+            "latitude": incident.latitude,
+            "longitude": incident.longitude,
+        },
+    )
     return incident
 
 
@@ -213,6 +232,7 @@ def get_incident(incident_id: int, db: Session = Depends(get_db)):
 def update_incident(
     incident_id: int,
     payload: IncidentUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """Partially update an incident. Only provided fields are changed."""
@@ -237,6 +257,12 @@ def update_incident(
     except SQLAlchemyError:
         db.rollback()
         raise
+    background_tasks.add_task(
+        redis_service.publish_event,
+        EventType.INCIDENT_UPDATED.value,
+        str(incident.id),
+        {"changed_fields": sorted(update_data), "status": incident.status.value},
+    )
     return incident
 
 

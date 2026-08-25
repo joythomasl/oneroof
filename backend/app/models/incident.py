@@ -17,6 +17,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     CheckConstraint,
+    Boolean,
 )
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geography
@@ -50,6 +51,8 @@ class IncidentStatus(str, enum.Enum):
     OPEN = "OPEN"
     ACKNOWLEDGED = "ACKNOWLEDGED"
     RESOLVED = "RESOLVED"
+    CLOSED = "CLOSED"
+    REOPENED = "REOPENED"
     DUPLICATE = "DUPLICATE"
 
 
@@ -61,6 +64,13 @@ class Incident(Base):
 
     # Primary key
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+
+    area_id = Column(
+        Integer,
+        ForeignKey("areas.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Reporter — plain int for now; Person 5B will create the User model/auth.
     reporter_id = Column(Integer, nullable=True)
@@ -96,6 +106,14 @@ class Incident(Base):
         nullable=False,
         default=IncidentStatus.OPEN,
     )
+
+    # Verification outcome from the CPOC workflow.
+    verification_note = Column(Text, nullable=True)
+    verified_by = Column(String(36), nullable=True)
+    verified_at = Column(DateTime(timezone=True), nullable=True)
+    location_flagged = Column(Boolean, nullable=False, default=False)
+    location_flag_reason = Column(Text, nullable=True)
+    closure_photo_distance_meters = Column(Float, nullable=True)
 
     # Timestamps
     created_at = Column(
@@ -145,6 +163,7 @@ class Incident(Base):
         Index("idx_incidents_type_created", "incident_type", "created_at"),
         Index("idx_incidents_severity_created", "severity", "created_at"),
         Index("idx_incidents_duplicate_of", "duplicate_of_id"),
+        Index("idx_incidents_area_status", "area_id", "status"),
     )
 
     def __repr__(self) -> str:

@@ -13,12 +13,14 @@ Does NOT use real people's personal data.
 
 import random
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 from geoalchemy2.elements import WKTElement
 
 from app.database import engine, Base, SessionLocal
 from app.models.incident import Incident, IncidentType, Severity, IncidentStatus
+from app.models.database_records import AreaRecord, PhotoRecord, UserRecord
 
 # Import models to register them with Base
 import app.models.incident  # noqa: F401
@@ -94,6 +96,46 @@ def seed(db: Session) -> None:
     random.seed(42)  # Repeatable
     now = datetime.now(timezone.utc)
     incidents: list[Incident] = []
+
+    # Shared districts used by mobile and both web dashboards.
+    area_specs = [
+        ("Coimbatore Central", "CBE-C", 11.0168, 76.9558, "EMERGENCY"),
+        ("Coimbatore West", "CBE-W", 11.0320, 77.0280, "ALERT"),
+        ("Coimbatore South", "CBE-S", 10.9505, 76.9470, "NORMAL"),
+    ]
+    areas: list[AreaRecord] = []
+    for name, code, lat, lon, state in area_specs:
+        area = db.query(AreaRecord).filter(AreaRecord.district_code == code).one_or_none()
+        if area is None:
+            area = AreaRecord(
+                name=name,
+                district_code=code,
+                latitude=lat,
+                longitude=lon,
+                current_state=state,
+            )
+            db.add(area)
+        areas.append(area)
+    db.flush()
+
+    # Stable demo identities for OTP/RBAC flows.
+    demo_users = [
+        ("10000000-0000-0000-0000-000000000001", "9000000001", "Demo Citizen", "citizen"),
+        ("10000000-0000-0000-0000-000000000002", "9000000002", "Demo Responder", "responder"),
+        ("10000000-0000-0000-0000-000000000003", "9000000003", "Demo CPOC Admin", "cpoc_admin"),
+    ]
+    for user_id, phone, name, role in demo_users:
+        if db.query(UserRecord).filter(UserRecord.phone == phone).one_or_none() is None:
+            db.add(
+                UserRecord(
+                    id=user_id,
+                    phone=phone,
+                    name=name,
+                    role=role,
+                    area_id=areas[0].id,
+                )
+            )
+    db.flush()
 
     # ── Regular incidents across locations ────────────────────────────────
     for i, (lat, lon, area) in enumerate(LOCATIONS):
@@ -250,6 +292,9 @@ def seed(db: Session) -> None:
         ))
 
     # ── Insert ────────────────────────────────────────────────────────────
+    for index, incident in enumerate(incidents):
+        incident.area_id = areas[index % len(areas)].id
+
     db.add_all(incidents)
     db.flush()
 
@@ -270,6 +315,27 @@ def seed(db: Session) -> None:
                 duplicate.status = IncidentStatus.DUPLICATE
                 duplicate.duplicate_of_id = original.id
 
+    # Photo metadata uses deterministic object keys. The seed does not invent
+    # binary files; demo assets can be uploaded to the same keys in MinIO or
+    # Supabase Storage without changing database rows.
+    responder_id = UUID(demo_users[1][0])
+    for index, incident in enumerate(incidents[:6], start=1):
+        object_key = f"demo/incidents/{incident.id}/report-{index}.jpg"
+        if db.query(PhotoRecord).filter(PhotoRecord.object_key == object_key).one_or_none() is None:
+            db.add(
+                PhotoRecord(
+                    incident_id=incident.id,
+                    object_key=object_key,
+                    content_type="image/jpeg",
+                    size_bytes=150000 + index * 1000,
+                    caption=f"Demo evidence for incident {incident.id}",
+                    latitude=incident.latitude,
+                    longitude=incident.longitude,
+                    captured_at=incident.created_at,
+                    uploaded_by=str(responder_id),
+                )
+            )
+
     db.commit()
 
     print(f"✅ Seeded {len(incidents)} incidents successfully.")
@@ -283,6 +349,7 @@ def main() -> None:
     db = SessionLocal()
     try:
         # Clear existing incidents for repeatable seeding
+        db.query(PhotoRecord).delete()
         deleted = db.query(Incident).delete()
         db.commit()
         if deleted:

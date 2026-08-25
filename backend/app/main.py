@@ -11,8 +11,9 @@ from fastapi.responses import JSONResponse
 
 import app.models.incident  # noqa: F401 - register SQLAlchemy metadata
 from app.config import get_settings
-from app.database import Base, engine
-from app.routers import auth, dedupe, incidents, upload, verification, websockets
+from app.database import Base, SessionLocal, engine
+from app.models.incident import Incident, IncidentStatus
+from app.routers import areas, auth, dedupe, incidents, upload, verification, websockets
 from app.services.incident_adapter import incident_adapter
 from app.services.jwt_service import jwt_service
 from app.services.photo_store import photo_store
@@ -26,6 +27,42 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-8s %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+async def _lookup_incident(incident_id: int):
+    """Resolve verification IDs against Person 5A's real incident table."""
+    with SessionLocal() as db:
+        return db.get(Incident, incident_id)
+
+
+async def _persist_verification(
+    incident_id: int, decision: str, verified_by, note: str
+) -> None:
+    """Persist Person 5B verification decisions on Person 5A incidents."""
+    with SessionLocal() as db:
+        incident = db.get(Incident, incident_id)
+        if incident is None:
+            raise LookupError(f"Incident {incident_id} not found")
+        incident.status = (
+            IncidentStatus.CLOSED if decision == "approved" else IncidentStatus.REOPENED
+        )
+        incident.verification_note = note or None
+        incident.verified_by = str(verified_by) if verified_by else None
+        from datetime import datetime, timezone
+
+        incident.verified_at = datetime.now(timezone.utc)
+        verification = await incident_adapter.get_verification(incident_id)
+        if verification is not None:
+            incident.location_flagged = verification.location_flagged
+            incident.location_flag_reason = verification.location_flag_reason or None
+            incident.closure_photo_distance_meters = (
+                verification.location_distance_meters
+            )
+        db.commit()
+
+
+incident_adapter.register_lookup(_lookup_incident)
+incident_adapter.register_writer(_persist_verification)
 
 
 @asynccontextmanager
@@ -102,6 +139,14 @@ async def health() -> dict:
         "status": "healthy" if (redis_ok and minio_ok) else "degraded",
         "environment": settings.environment,
         "dependencies": {
+            "database": {
+                "backend": (
+                    "supabase-postgresql"
+                    if settings.supabase_configured
+                    else "postgresql"
+                ),
+                "supabase_configured": settings.supabase_configured,
+            },
             "redis": {
                 "connected": redis_ok,
                 "channel": settings.redis_incident_channel,
@@ -135,5 +180,6 @@ app.include_router(verification.router)
 app.include_router(websockets.router)
 
 # Person 5A routers
+app.include_router(areas.router, prefix="/api/v1")
 app.include_router(incidents.router, prefix="/api/v1")
 app.include_router(dedupe.router, prefix="/api/v1")
