@@ -6,8 +6,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_p2p_connection/flutter_p2p_connection.dart';
+import 'package:oneroof/l10n/locale_controller.dart';
 import 'package:oneroof/main.dart';
 import 'package:oneroof/mesh/bridge_mode.dart';
 import 'package:oneroof/mesh/connection_manager.dart';
@@ -17,9 +19,17 @@ import 'package:oneroof/screens/mesh/bridge_screen.dart';
 import 'package:oneroof/screens/mesh/cycle_test_screen.dart';
 import 'package:oneroof/theme/app_theme.dart';
 
+/// Helper: build a [SamanvayApp] that does not require async init.
+Future<Widget> _buildApp() async {
+  SharedPreferences.setMockInitialValues(<String, Object>{});
+  final LocaleController ctrl = await LocaleController.load();
+  return SamanvayApp(localeController: ctrl);
+}
+
 void main() {
   testWidgets('root shell shows all four tabs', (WidgetTester tester) async {
-    await tester.pumpWidget(const SamanvayApp());
+    await tester.pumpWidget(await _buildApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Mesh'), findsWidgets);
@@ -40,7 +50,8 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const SamanvayApp());
+    await tester.pumpWidget(await _buildApp());
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.hub_outlined));
     await tester.pump();
 
@@ -125,17 +136,31 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('home shows area state and cycles duty status',
+  testWidgets('home shows area state and duty status selector',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const SamanvayApp());
+    await tester.pumpWidget(await _buildApp());
+    await tester.pumpAndSettle();
 
     expect(find.widgetWithText(StatusBadge, 'EMERGENCY'), findsOneWidget);
+    // The localized label for 'Available' is the initial status.
     expect(find.text('Available'), findsOneWidget);
 
-    await tester.tap(find.text('Change to En Route'));
-    await tester.pump();
+    // Tap "Change status" to open the bottom-sheet selector.
+    await tester.tap(find.text('Change status'));
+    await tester.pumpAndSettle();
 
-    expect(find.text('En Route'), findsOneWidget);
+    // The bottom sheet should list all five statuses.
+    expect(find.text('En route'), findsOneWidget);
+    expect(find.text('Engaged'), findsOneWidget);
+    expect(find.text('Resting'), findsOneWidget);
+    expect(find.text('Off duty'), findsOneWidget);
+
+    // Select "En route" from the sheet.
+    await tester.tap(find.text('En route'));
+    await tester.pumpAndSettle();
+
+    // Status should now show En route.
+    expect(find.text('En route'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });

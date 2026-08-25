@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'l10n/app_localizations.dart';
+import 'l10n/locale_controller.dart';
 import 'mesh/device_identity.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/mesh/mesh_screen.dart';
@@ -7,26 +10,39 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/reports/reports_screen.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   // Fix this device's mesh identity at start-up rather than letting the first
   // screen that needs it decide when the id comes into being.
   DeviceIdentity.initialise();
-  runApp(const SamanvayApp());
+  runApp(SamanvayApp(localeController: await LocaleController.load()));
 }
 
 class SamanvayApp extends StatelessWidget {
-  const SamanvayApp({super.key});
+  const SamanvayApp({super.key, required this.localeController});
+  final LocaleController localeController;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return AppLocaleScope(
+      controller: localeController,
+      child: MaterialApp(
       title: 'Samanvay Responder',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
+      locale: localeController.locale,
+      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
       // While testing we skip auth and drop straight into the tab shell.
       // TODO(backend): switch this to `const LoginScreen()` once the OTP
       // endpoint is live, and gate it on a stored session token.
       home: const RootNav(),
+      ),
     );
   }
 }
@@ -55,32 +71,33 @@ class _RootNavState extends State<RootNav> {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: IndexedStack(index: _index, children: _tabs),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
         onTap: (int i) => setState(() => _index = i),
         iconSize: 26,
-        items: const <BottomNavigationBarItem>[
+        items: <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
-            label: 'Home',
+            icon: const Icon(Icons.dashboard_outlined),
+            activeIcon: const Icon(Icons.dashboard),
+            label: l10n.home,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.hub_outlined),
-            activeIcon: Icon(Icons.hub),
-            label: 'Mesh',
+            icon: const Icon(Icons.hub_outlined),
+            activeIcon: const Icon(Icons.hub),
+            label: l10n.mesh,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.description_outlined),
-            activeIcon: Icon(Icons.description),
-            label: 'Reports',
+            icon: const Icon(Icons.description_outlined),
+            activeIcon: const Icon(Icons.description),
+            label: l10n.reports,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            activeIcon: const Icon(Icons.person),
+            label: l10n.profile,
           ),
         ],
       ),
