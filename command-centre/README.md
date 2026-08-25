@@ -27,12 +27,12 @@ See [REQUIREMENTS.md](./REQUIREMENTS.md) for tester prerequisites and [TESTING.m
 
 ## Implemented features
 
-- Map-first command-centre layout with nine scenario districts
-- Scenario switcher with a fictional live demo and a 2018 Kerala floods historical replay
+- Map-first command-centre layout with nine scenario districts over a locally bundled satellite basemap
+- Kanara fictional live demo as the default, with the 2018 Kerala floods historical replay still available from the scenario switcher
 - Live simulation clock using the current system date and time while historical evidence retains its original context
 - Persistent training-data and schematic-map disclosures in historical mode
-- District NORMAL, ALERT, and EMERGENCY states
-- P0-P3 incident markers with type glyphs, status rings, overdue pulse, and report counts
+- District NORMAL, ALERT, and EMERGENCY states in operational summaries and district cards
+- Borderless satellite map with interactive P0-P3 risk pointers, type glyphs, status rings, overdue pulse, and report counts
 - Deployed agency-unit badges and status indicators
 - Mouse-wheel zoom, drag pan, zoom controls, and keyboard selection
 - Synchronized incident map markers and issue worklist
@@ -43,7 +43,7 @@ See [REQUIREMENTS.md](./REQUIREMENTS.md) for tester prerequisites and [TESTING.m
 - Phone, email, and district-net channel chooser
 - Geotagged evidence gallery and full metadata lightbox
 - Live clock, elapsed-emergency timer, status counters, and emergency-district popover
-- Account menu, network-condition simulation, demo timer controls, and light/dark/system themes
+- Persistent dark/light theme shortcut plus account-menu system, light, and dark controls
 - Responsive desktop and tablet layouts
 
 ## Project structure
@@ -66,7 +66,7 @@ The UI reads CPOC and incident mutations through `src/services/api.ts`, which is
 
 ## Difference from `command-centre.html`
 
-The original prototype is one 2,700+ line HTML file with inline CSS, hardcoded data, mutable global state, and imperative render functions. This project separates typed domain data, reusable React components, shared Zustand state, services, and styles. The scenario switch updates the header, clock, risk shading, incidents, units, district cards, contacts, and evidence together without editing the UI code. It also adds automated interaction tests and production build/type checks.
+The original prototype is one 2,700+ line HTML file with inline CSS, hardcoded data, mutable global state, and imperative render functions. This project separates typed domain data, reusable React components, shared Zustand state, services, and styles. The scenario switch updates the header, clock, colour-coded risk pointers, incidents, units, district cards, contacts, and evidence together without editing the UI code. It also adds automated interaction tests and production build/type checks.
 
 Both versions currently simulate their data source. To become operationally realtime, `src/services/api.ts` still needs to be connected to authenticated backend endpoints and a subscription transport such as WebSocket, Server-Sent Events, or Supabase Realtime.
 

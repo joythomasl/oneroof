@@ -19,16 +19,19 @@ npm run preview
 
 ### Scenario replay
 
+- Confirm **Kanara fictional demo** and its original district/incident data load by default.
 - Use the header selector to switch between **Kerala Floods 2018** and **Kanara fictional demo**.
-- Confirm the header, replay badge, district names, risk shading, incidents, units, and photo records all change together.
+- Confirm the header, replay badge, district names, incident pointers, units, and photo records all change together.
 - Confirm the command-centre clock continues to show the current date and time in both scenarios, because the simulation is treated as happening now.
 - Confirm the Kerala scenario shows **HISTORICAL REPLAY** and the training-data disclosure.
 - Select a district or incident and confirm the central replay notice disappears instead of overlapping the open card.
 
 ### Risk map
 
-- Confirm emergency districts are red, alert districts are orange, and calm districts use the neutral state.
-- Click a district and confirm its card opens with hazard, camp, unit, CPOC, and severity details.
+- Confirm the satellite image is unobstructed by district polygons or borders and its imagery credit is visible at the lower-right.
+- Confirm incident pointers use the P0 red, P1 orange, P2 yellow, and P3 green risk scale shown in the legend.
+- Click each pointer and confirm the matching issue is selected in the right panel; click the map background to clear it.
+- Open a district from the **districts active** counter or an incident detail and confirm its card shows hazard, camp, unit, CPOC, and severity details.
 - Use the mouse wheel or map buttons to zoom; drag the map to pan; use reset to return to the full view.
 - Select an incident marker and confirm the matching item in the right panel is selected.
 
@@ -55,9 +58,10 @@ npm run preview
 
 ### Appearance, accessibility, and layout
 
+- Use the header moon/sun button to switch directly between dark and light themes.
 - Switch between system, light, and dark themes from the account menu.
 - Navigate interactive controls with Tab and activate them with Enter or Space.
-- Resize the browser through 1440 px, 1180 px, 1024 px, and 900 px widths. Header controls, status statistics, overlays, and cards should progressively simplify without colliding.
+- Resize the browser through 1440 px, 1180 px, 1024 px, and 900 px widths. Header controls and status statistics should simplify without colliding; at 1100 px and below, the issue panel should move below the full-width map.
 - Enable **Reduce motion** in the operating system and confirm entrance animations become effectively instant.
 
 ## Automated checkpoint
@@ -71,3 +75,8 @@ npm run lint
 ```
 
 Commit `package.json` and `package-lock.json` together whenever dependencies change.
+# High-resolution map and real-data feed
+
+The satellite basemap uses resolution-independent map tiles, so details continue loading as you zoom instead of enlarging one fixed JPG. An internet connection is required for fresh Esri imagery; the Tamil Nadu image in `public/` is the offline fallback.
+
+To test a real incident endpoint, copy `.env.example` to `.env.local`, set `VITE_INCIDENTS_API_URL`, then restart `npm run dev`. The endpoint may return either an array of incident records or `{ "incidents": [...] }`. The map polls it at `VITE_INCIDENTS_POLL_MS` and retains the last valid state if a request fails.

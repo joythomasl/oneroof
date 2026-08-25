@@ -68,6 +68,28 @@ export default function Header() {
         <button className="linkbtn" onClick={() => toast(scenario.mode === 'historical'
           ? 'Replay mode is isolated: actions only change reconstructed in-memory records.'
           : 'Fictional demo actions only change in-memory records.')}>{scenario.mode === 'historical' ? 'Replay mode: ON' : 'Demo mode: ON'}</button>
+        <button
+          className="theme-toggle"
+          type="button"
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          onClick={() => {
+            const next = theme === 'dark' ? 'light' : 'dark';
+            setTheme(next);
+            toast(`Switched to ${next} theme.`);
+          }}
+        >
+          {theme === 'dark' ? (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z" />
+            </svg>
+          )}
+        </button>
         <button className="acct-btn" aria-haspopup="menu" aria-expanded={acctMenuOpen}
           onClick={(e) => { e.stopPropagation(); setAcctMenuOpen(!acctMenuOpen); }}>
           <span className="avatar">DK</span>

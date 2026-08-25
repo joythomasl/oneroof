@@ -32,14 +32,14 @@ export const SCENARIOS: ScenarioMeta[] = [
   },
   {
     id: 'kanara-live',
-    label: 'Kanara State — fictional live demo',
-    shortLabel: 'Kanara fictional demo',
+    label: 'Tamil Nadu — fictional live demo',
+    shortLabel: 'Tamil Nadu live demo',
     mode: 'fictional',
-    stateName: 'Kanara State',
-    eocLabel: 'SDMA / EOC · TRIVANDRUM',
+    stateName: 'Tamil Nadu',
+    eocLabel: 'TNSDMA / SEOC · CHENNAI',
     referenceTime: null,
-    scope: '9 fictional districts',
-    disclosure: 'Fictional demonstration records · simulated API',
+    scope: '9-district Tamil Nadu simulation',
+    disclosure: 'Fictional Tamil Nadu demonstration records · simulated API',
     leadHours: 18.7,
   },
 ];
@@ -117,6 +117,25 @@ function makeIncident(
   };
 }
 
+// Stable coordinates within one compact Aluva/Periyar response area.
+// These values are never generated or offset while rendering.
+const KERALA_FLOOD_COORDINATES: Record<string, readonly [number, number]> = {
+  'KRF-1801': [10.1023, 76.3560],
+  'KRF-1802': [10.1180, 76.3515],
+  'KRF-1803': [10.0875, 76.3700],
+  'KRF-1804': [10.1255, 76.3820],
+  'KRF-1805': [10.0735, 76.3480],
+  'KRF-1806': [10.1110, 76.3330],
+  'KRF-1807': [10.0930, 76.3860],
+  'KRF-1808': [10.1290, 76.3600],
+  'KRF-1809': [10.0620, 76.3770],
+  'KRF-1810': [10.1390, 76.3420],
+  'KRF-1811': [10.0810, 76.3290],
+  'KRF-1812': [10.1460, 76.3730],
+  'KRF-1813': [10.0520, 76.3520],
+  'KRF-1814': [10.1040, 76.4020],
+};
+
 function historicalIncidents(): Incident[] {
   const rows: Array<[string, string, Incident['type'], Incident['severity'], Incident['status'], string, string, number, number, Array<[string, string, string | null, string | null, 'lead' | 'supporting', number]>]> = [
     ['KRF-1801', 'nedumbara', 'rescue', 0, 'IN_PROGRESS', 'Rooftop rescues — Aluva sector', 'Training reconstruction of clustered rescue calls from inundated neighbourhoods along the Periyar.', 34, 8, [['ndrf', 'NDRF', 'ndrf-11', 'NDRF-11', 'lead', 28], ['fire', 'Fire Force', 'fire-04', 'FIRE-04', 'supporting', 22]]],
@@ -138,7 +157,9 @@ function historicalIncidents(): Incident[] {
   return rows.map(([id, areaId, type, severity, status, title, description, age, reports, assignmentRows]) => {
     const assignments = assignmentRows.map(([agencyId, agencyName, unitId, callSign, role, assignedAge]) =>
       assignment(id, agencyId, agencyName, unitId, callSign, role, assignedAge));
-    return makeIncident(id, areaId, type, severity, status, title, description, age, reports, assignments);
+    const incident = makeIncident(id, areaId, type, severity, status, title, description, age, reports, assignments);
+    const [lat, lng] = KERALA_FLOOD_COORDINATES[id];
+    return { ...incident, lat, lng, areaId: 'nedumbara' };
   });
 }
 

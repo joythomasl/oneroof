@@ -2,22 +2,17 @@ import { useUIStore } from '../../stores/uiStore';
 import { DEMO_INCIDENTS, DEMO_AREAS } from '../../demo/seed';
 import { STATUS_CONFIG, INCIDENT_TYPE_LABELS } from '../../types/domain';
 import { fmtAge, ageMinOf, isOverdue } from '../helpers';
-import { incidentPosition } from './mapLayout';
+import type { Incident } from '../../types/domain';
 
-export default function IncidentCallout() {
-  const { selectedIncidentId, selectArea, setMapTransform } = useUIStore();
-  const i = DEMO_INCIDENTS.find(x => x.id === selectedIncidentId);
+export default function IncidentCallout({ incident, onZoomTo }: { incident?: Incident; onZoomTo: (lng: number, lat: number) => void }) {
+  const { selectedIncidentId, selectArea } = useUIStore();
+  const i = incident ?? DEMO_INCIDENTS.find(x => x.id === selectedIncidentId);
   if (!i) return null;
 
   const st = STATUS_CONFIG[i.status];
   const area = DEMO_AREAS.find(a => a.id === i.areaId);
   const ageMn = ageMinOf(i.createdAt);
   const over = isOverdue(i.severity, i.createdAt);
-  const zoomToIncident = () => {
-    const { x, y } = incidentPosition(i);
-    const zoom = 2.2;
-    setMapTransform(zoom, 500 - x * zoom, 360 - y * zoom);
-  };
 
   return (
     <div className="ov callout" style={{ right: 12, top: 12 }}>
@@ -33,7 +28,7 @@ export default function IncidentCallout() {
       <div className="kv"><span>Reports</span><b>{i.reports} ({i.reportingAgencies} agencies)</b></div>
       <div className="kv"><span>Agencies</span><b>{i.assignments.length ? i.assignments.map(a => a.agencyName).join(', ') : '— none —'}</b></div>
       <div className="callout-actions">
-        <button className="btn sm" onClick={zoomToIncident}>Zoom to</button>
+        <button className="btn sm" onClick={() => onZoomTo(i.lng, i.lat)}>Zoom to</button>
         <button className="btn sm" onClick={() => selectArea(i.areaId)}>Open district</button>
       </div>
     </div>

@@ -230,7 +230,16 @@ export const useUIStore = create<UIState>((set) => ({
   togglePanel: () => set((s) => ({ panelCollapsed: !s.panelCollapsed })),
   setCollapsed: (v) => set({ panelCollapsed: v }),
 
-  setMapTransform: (k, tx, ty) => set({ mapK: k, mapTx: tx, mapTy: ty }),
+  setMapTransform: (k, tx, ty) => {
+    const mapK = Math.min(6, Math.max(1, k));
+    const minTx = 1000 - 1000 * mapK;
+    const minTy = 720 - 720 * mapK;
+    set({
+      mapK,
+      mapTx: Math.min(0, Math.max(minTx, tx)),
+      mapTy: Math.min(0, Math.max(minTy, ty)),
+    });
+  },
   setLeadH: (h) => set({ leadH: h }),
 
   openCpocModal: (areaId, incidentId) => set({ cpocModalArea: areaId, cpocModalIncident: incidentId ?? null }),

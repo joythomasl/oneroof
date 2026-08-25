@@ -10,6 +10,7 @@ beforeEach(() => {
   NET.latency = 1;
   NET.failCpoc = false;
   useUIStore.getState().setScenario('kanara-live');
+  useUIStore.getState().setTheme('light');
   useUIStore.setState({
     selectedAreaId: null,
     selectedIncidentId: null,
@@ -41,7 +42,7 @@ describe('UNIRES Command Centre', () => {
     expect(screen.getByText(new RegExp(String(new Date().getFullYear())))).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /Rooftop rescues — Aluva sector/i })).toBeInTheDocument();
     expect(screen.getAllByText(/not an authoritative incident log/i)).toHaveLength(2);
-    await user.click(screen.getByRole('button', { name: /Ernakulam district/i }));
+    await user.click(screen.getByRole('option', { name: /Rooftop rescues — Aluva sector/i }));
     expect(screen.getAllByText(/not an authoritative incident log/i)).toHaveLength(1);
   });
 
@@ -57,16 +58,18 @@ describe('UNIRES Command Centre', () => {
   it('keeps district selection, filter state, and district card synchronized', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('button', { name: /Karippodu district/i }));
+    await user.click(screen.getByRole('button', { name: /districts active/i }));
+    await user.click(screen.getByRole('button', { name: /Coimbatore.*open incidents/i }));
     expect(screen.getByRole('button', { name: /Clear district filter/i })).toBeInTheDocument();
-    expect(screen.getByText('Urban port · pop. 4.1 L')).toBeInTheDocument();
+    expect(screen.getByText('Western urban hub · simulated sector')).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /Rooftop rescue/i })).not.toBeInTheDocument();
   });
 
   it('opens the CPOC workflow and available channel chooser', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('button', { name: /Karippodu district/i }));
+    await user.click(screen.getByRole('button', { name: /districts active/i }));
+    await user.click(screen.getByRole('button', { name: /Coimbatore.*open incidents/i }));
     await user.click(screen.getByRole('button', { name: /Contact CPOC/i }));
     expect((await screen.findAllByText(/Meera Nandakumar/i)).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /Choose channel/i }));
@@ -78,7 +81,8 @@ describe('UNIRES Command Centre', () => {
   it('opens the evidence gallery and full metadata lightbox', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('button', { name: /Karippodu district/i }));
+    await user.click(screen.getByRole('button', { name: /districts active/i }));
+    await user.click(screen.getByRole('button', { name: /Coimbatore.*open incidents/i }));
     await user.click(screen.getByRole('button', { name: /Photos \(6\)/i }));
     expect(screen.getByRole('dialog', { name: /Photo evidence/i })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Initial report — north face/i }));
@@ -103,8 +107,25 @@ describe('UNIRES Command Centre', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('button', { name: /D. Krishnankutty/i }));
-    await user.click(screen.getByRole('button', { name: /Dark/i }));
+    await user.click(screen.getByRole('button', { name: /^Dark$/i }));
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+  });
+
+  it('switches theme from the persistent header control', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /Switch to dark theme/i }));
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    await user.click(screen.getByRole('button', { name: /Switch to light theme/i }));
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+  });
+
+  it('selects a colour-coded incident pointer and synchronizes the issue list', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const incidentRow = screen.getByRole('option', { name: /Collapse — 6 trapped/i });
+    await user.click(screen.getByRole('button', { name: /INC-2041, P0 risk, Collapse — 6 trapped/i }));
+    expect(incidentRow).toHaveAttribute('aria-selected', 'true');
   });
 
   it('exercises the simulated link failure and renders a retryable CPOC error', async () => {
@@ -112,7 +133,8 @@ describe('UNIRES Command Centre', () => {
     render(<App />);
     await user.click(screen.getByRole('button', { name: /D. Krishnankutty/i }));
     await user.click(screen.getByRole('button', { name: 'Fail' }));
-    await user.click(screen.getByRole('button', { name: /Karippodu district/i }));
+    await user.click(screen.getByRole('button', { name: /districts active/i }));
+    await user.click(screen.getByRole('button', { name: /Coimbatore.*open incidents/i }));
     await user.click(screen.getByRole('button', { name: /Contact CPOC/i }));
     expect(await screen.findByText(/CPOC lookup failed/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument();
