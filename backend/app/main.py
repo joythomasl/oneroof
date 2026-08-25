@@ -47,7 +47,7 @@ async def _persist_verification(
             IncidentStatus.CLOSED if decision == "approved" else IncidentStatus.REOPENED
         )
         incident.verification_note = note or None
-        incident.verified_by = str(verified_by) if verified_by else None
+        incident.verified_by = verified_by
         from datetime import datetime, timezone
 
         incident.verified_at = datetime.now(timezone.utc)
@@ -71,8 +71,12 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info("Starting %s (environment=%s)", settings.app_name, settings.environment)
 
-    # Person 5A: create incident tables for hackathon deployments without Alembic.
-    Base.metadata.create_all(bind=engine)
+    # Versioned migrations own the schema. Throwaway local setups can opt in;
+    # production must never mutate schema merely by starting the API.
+    if settings.auto_create_schema:
+        if not settings.is_development:
+            raise RuntimeError("AUTO_CREATE_SCHEMA is allowed only in development")
+        Base.metadata.create_all(bind=engine)
 
     jwt_service.warn_if_insecure()
     if not jwt_service.available:
@@ -110,7 +114,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -173,13 +177,13 @@ async def health() -> dict:
     }
 
 
-# Person 5B routers
-app.include_router(auth.router)
-app.include_router(upload.router)
-app.include_router(verification.router)
-app.include_router(websockets.router)
+# Person 5B routers. Keep original paths as compatibility aliases while new
+# clients use one consistent, versioned namespace.
+for router in (auth.router, upload.router, verification.router, websockets.router):
+    app.include_router(router, prefix=settings.api_prefix)
+    app.include_router(router)
 
 # Person 5A routers
-app.include_router(areas.router, prefix="/api/v1")
-app.include_router(incidents.router, prefix="/api/v1")
-app.include_router(dedupe.router, prefix="/api/v1")
+app.include_router(areas.router, prefix=settings.api_prefix)
+app.include_router(incidents.router, prefix=settings.api_prefix)
+app.include_router(dedupe.router, prefix=settings.api_prefix)

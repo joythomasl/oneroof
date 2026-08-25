@@ -28,7 +28,7 @@ class PhotoStore:
     @staticmethod
     def _domain(row: PhotoRecord) -> Photo:
         return Photo(
-            id=UUID(row.id),
+            id=row.id if isinstance(row.id, UUID) else UUID(str(row.id)),
             incident_id=row.incident_id,
             object_key=row.object_key,
             content_type=row.content_type,
@@ -38,10 +38,18 @@ class PhotoStore:
             latitude=row.latitude,
             longitude=row.longitude,
             captured_at=row.captured_at,
-            uploaded_by=UUID(row.uploaded_by) if row.uploaded_by else None,
+            uploaded_by=(
+                row.uploaded_by
+                if isinstance(row.uploaded_by, UUID)
+                else UUID(str(row.uploaded_by))
+            ) if row.uploaded_by else None,
             uploaded_at=row.uploaded_at,
             verified_at=row.verified_at,
-            verified_by=UUID(row.verified_by) if row.verified_by else None,
+            verified_by=(
+                row.verified_by
+                if isinstance(row.verified_by, UUID)
+                else UUID(str(row.verified_by))
+            ) if row.verified_by else None,
         )
 
     def _remember(self, photo: Photo) -> Photo:
@@ -118,7 +126,7 @@ class PhotoStore:
                 if row is None:
                     return None
                 row.status = photo_status.value
-                row.verified_by = str(verified_by) if verified_by else None
+                row.verified_by = verified_by
                 row.verified_at = datetime.now(timezone.utc)
                 db.commit()
                 db.refresh(row)
