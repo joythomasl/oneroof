@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Optional
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,7 +21,11 @@ class Settings(BaseSettings):
 
     app_name: str = "One Roof API"
     environment: str = "development"
-    debug: bool = False
+    debug: bool = Field(default=False, validation_alias="ONEROOF_DEBUG")
+    auto_create_schema: bool = False
+    allow_ephemeral_stores: bool = False
+    api_prefix: str = "/api/v1"
+    cors_origins: str = "*"
 
     DATABASE_URL: str = "postgresql://oneroof:oneroof@localhost:5432/oneroof"
     DEDUPE_RADIUS_METERS: float = 500.0
@@ -63,6 +68,12 @@ class Settings(BaseSettings):
     @property
     def supabase_configured(self) -> bool:
         return bool(self.supabase_url and self.supabase_anon_key)
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """Return the comma-separated browser origins accepted by CORS."""
+        origins = [origin.strip() for origin in self.cors_origins.split(",")]
+        return [origin for origin in origins if origin] or ["*"]
 
     @property
     def APP_NAME(self) -> str:

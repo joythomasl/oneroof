@@ -28,7 +28,7 @@ class UserStore:
     @staticmethod
     def _domain(row: UserRecord) -> User:
         return User(
-            id=UUID(row.id),
+            id=row.id if isinstance(row.id, UUID) else UUID(str(row.id)),
             phone=row.phone,
             name=row.name,
             role=UserRole(row.role),

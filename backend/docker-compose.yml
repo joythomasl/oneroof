@@ -85,7 +85,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-oneroof-uploads}
-      DEBUG: "true"
+      ONEROOF_DEBUG: "true"
     ports:
       - "8000:8000"
     volumes:

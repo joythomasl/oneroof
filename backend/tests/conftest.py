@@ -15,7 +15,7 @@ from app.database import Base, get_db
 from app.main import app
 
 # Import models so tables are registered with Base.metadata
-import app.models.incident  # noqa: F401
+import app.models.incident as incident_models  # noqa: F401
 
 
 # Use a test database URL (default: same DB for hackathon simplicity)
@@ -65,6 +65,9 @@ def client(db_session: Session) -> TestClient:
             pass
 
     app.dependency_overrides[get_db] = _override_get_db
-    with TestClient(app) as c:
-        yield c
+    # These tests exercise request handlers, not external-service startup.
+    # Avoid running the application lifespan (Redis/MinIO) for every test.
+    c = TestClient(app)
+    yield c
+    c.close()
     app.dependency_overrides.clear()
