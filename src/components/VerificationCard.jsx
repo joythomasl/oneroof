@@ -3,7 +3,6 @@ function VerificationCard({
   onApprove,
   onReject,
   processing,
-  readOnly,
 }) {
   const {
     incident,
@@ -16,7 +15,9 @@ function VerificationCard({
   return (
     <article
       className={`verification-card ${
-        !geo.valid ? "verification-warning" : ""
+        !geo.valid
+          ? "verification-warning"
+          : ""
       }`}
     >
 
@@ -33,6 +34,7 @@ function VerificationCard({
           </span>
 
           <div>
+
             <strong>
               {incident.id}
             </strong>
@@ -40,9 +42,11 @@ function VerificationCard({
             <span>
               {incident.title}
             </span>
+
           </div>
 
         </div>
+
 
         <div className="verification-meta">
 
@@ -57,31 +61,6 @@ function VerificationCard({
         </div>
 
       </div>
-
-
-      {/* Status */}
-
-      {readOnly && (
-        <div
-          className={`verification-final-status ${
-            item.status.toLowerCase()
-          }`}
-        >
-
-          <span>
-            {item.status === "CLOSED"
-              ? "✓"
-              : "⚠"}
-          </span>
-
-          <strong>
-            {item.status === "CLOSED"
-              ? "VERIFICATION CLOSED"
-              : "INCIDENT REOPENED"}
-          </strong>
-
-        </div>
-      )}
 
 
       {/* Evidence comparison */}
@@ -111,7 +90,9 @@ function VerificationCard({
 
       <div
         className={`geo-check ${
-          geo.valid ? "valid" : "invalid"
+          geo.valid
+            ? "valid"
+            : "invalid"
         }`}
       >
 
@@ -184,41 +165,28 @@ function VerificationCard({
 
       {/* Actions */}
 
-      {!readOnly && (
+      <div className="verification-actions">
 
-        <div className="verification-actions">
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => onReject(item)}
+        >
+          Reject
+        </button>
 
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => {
-              console.log(
-                "Reject button clicked:",
-                item.id
-              );
+        <button
+          type="button"
+          className="approve-button"
+          onClick={() => onApprove(item)}
+          disabled={processing}
+        >
+          {processing
+            ? "VERIFYING..."
+            : "✓ Approve & Close"}
+        </button>
 
-              onReject(item);
-            }}
-            disabled={processing}
-          >
-            Reject
-          </button>
-
-
-          <button
-            type="button"
-            className="approve-button"
-            onClick={() => onApprove(item)}
-            disabled={processing}
-          >
-            {processing
-              ? "VERIFYING..."
-              : "✓ Approve & Close"}
-          </button>
-
-        </div>
-
-      )}
+      </div>
 
     </article>
   );
@@ -237,19 +205,32 @@ function EvidencePanel({
         {label}
       </div>
 
-
       <div
         className={`evidence-image ${type}`}
       >
 
-        <img
-          src={data.image}
-          alt={
-            type === "original"
-              ? "Original incident report"
-              : "Resolution evidence"
-          }
-        />
+        {data.image ? (
+          <img
+            src={data.image}
+            alt={
+              type === "original"
+                ? "Original incident report"
+                : "Resolution evidence"
+            }
+          />
+        ) : (
+          <div className="image-placeholder">
+            <div className="image-symbol">
+              {type === "original"
+                ? "IMG"
+                : "RES"}
+            </div>
+
+            <span>
+              EVIDENCE PREVIEW
+            </span>
+          </div>
+        )}
 
         <div className="image-overlay">
 
@@ -279,7 +260,6 @@ function EvidencePanel({
 
         </div>
 
-
         <div>
 
           <span>
@@ -306,7 +286,9 @@ function IntegrityCheck({
   return (
     <div
       className={`integrity-check ${
-        valid ? "valid" : "invalid"
+        valid
+          ? "valid"
+          : "invalid"
       }`}
     >
 
