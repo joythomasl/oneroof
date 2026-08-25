@@ -1,13 +1,4 @@
-"""
-ONE ROOF - FastAPI Application Entrypoint
-
-    uvicorn app.main:app --reload
-
-Startup connects Redis, ensures the MinIO bucket exists, and starts
-the WebSocket fan-out listener. None of these are fatal: if Redis or
-MinIO is down the API still boots, and /health reports the real state
-rather than a green light.
-"""
+"""Combined ONE ROOF FastAPI application for Person 5A and Person 5B."""
 
 from __future__ import annotations
 
@@ -18,8 +9,11 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+import app.models.incident  # noqa: F401 - register SQLAlchemy metadata
 from app.config import get_settings
-from app.routers import auth, upload, verification, websockets
+from app.database import Base, SessionLocal, engine
+from app.models.incident import Incident, IncidentStatus
+from app.routers import areas, auth, dedupe, incidents, upload, verification, websockets
 from app.services.incident_adapter import incident_adapter
 from app.services.jwt_service import jwt_service
 from app.services.photo_store import photo_store
@@ -35,63 +29,85 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def _lookup_incident(incident_id: int):
+    """Resolve verification IDs against Person 5A's real incident table."""
+    with SessionLocal() as db:
+        return db.get(Incident, incident_id)
+
+
+async def _persist_verification(
+    incident_id: int, decision: str, verified_by, note: str
+) -> None:
+    """Persist Person 5B verification decisions on Person 5A incidents."""
+    with SessionLocal() as db:
+        incident = db.get(Incident, incident_id)
+        if incident is None:
+            raise LookupError(f"Incident {incident_id} not found")
+        incident.status = (
+            IncidentStatus.CLOSED if decision == "approved" else IncidentStatus.REOPENED
+        )
+        incident.verification_note = note or None
+        incident.verified_by = str(verified_by) if verified_by else None
+        from datetime import datetime, timezone
+
+        incident.verified_at = datetime.now(timezone.utc)
+        verification = await incident_adapter.get_verification(incident_id)
+        if verification is not None:
+            incident.location_flagged = verification.location_flagged
+            incident.location_flag_reason = verification.location_flag_reason or None
+            incident.closure_photo_distance_meters = (
+                verification.location_distance_meters
+            )
+        db.commit()
+
+
+incident_adapter.register_lookup(_lookup_incident)
+incident_adapter.register_writer(_persist_verification)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start and stop shared infrastructure alongside the app."""
+    """Initialize 5A storage and 5B infrastructure, then cleanly stop it."""
     settings = get_settings()
     logger.info("Starting %s (environment=%s)", settings.app_name, settings.environment)
+
+    # Person 5A: create incident tables for hackathon deployments without Alembic.
+    Base.metadata.create_all(bind=engine)
 
     jwt_service.warn_if_insecure()
     if not jwt_service.available:
         logger.warning("PyJWT missing - login will succeed but issue no token.")
 
-    # Redis: never fatal.
     await redis_service.connect()
-    if redis_service.available:
-        logger.info("Redis ready.")
-    else:
+    if not redis_service.available:
         logger.warning("Redis DOWN - OTP uses memory fallback, pub/sub disabled.")
 
-    # MinIO: never fatal, uploads self-heal once it comes up.
-    if await s3_service.ensure_bucket():
-        logger.info("MinIO bucket '%s' ready.", settings.minio_bucket)
-    else:
-        logger.warning(
-            "MinIO DOWN or bucket unavailable - uploads will return 503 until fixed."
-        )
+    if not await s3_service.ensure_bucket():
+        logger.warning("MinIO unavailable - uploads return 503 until it recovers.")
 
     await ws_manager.start()
-
     if settings.is_development:
         await user_store.seed_demo_users()
 
     try:
         yield
     finally:
-        logger.info("Shutting down...")
         await ws_manager.stop()
         await redis_service.close()
-        logger.info("Shutdown complete.")
 
 
 settings = get_settings()
 
 app = FastAPI(
-    title="SIH Emergency Response Backend",
+    title=settings.app_name,
     description=(
-        "ONE ROOF backend API.\n\n"
-        "**Person 5B scope:** OTP authentication, user and role management, "
-        "MinIO media storage, Redis pub/sub, real-time WebSockets, and "
-        "incident verification.\n\n"
-        "**Person 5A scope:** incident CRUD, PostGIS spatial queries and "
-        "deduplication - integrated through `app/services/incident_adapter.py`."
+        "ONE ROOF backend: incident CRUD, PostGIS search, deduplication, "
+        "authentication, media storage, verification, Redis, and WebSockets."
     ),
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
-# Open CORS: the web and mobile clients are served from other origins
-# during the hackathon. Restrict `allow_origins` before any real deploy.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -101,14 +117,8 @@ app.add_middleware(
 )
 
 
-# -- Error handling -------------------------------------------
-
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    """
-    Catch-all so an unexpected error never leaks a stack trace to a
-    client. The full traceback still goes to the server log.
-    """
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -116,35 +126,30 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-# -- Root and health ------------------------------------------
-
 @app.get("/", tags=["Health"], summary="Service banner")
 async def root() -> dict:
     return {"message": "Backend is running successfully"}
 
 
-@app.get(
-    "/health",
-    tags=["Health"],
-    summary="Dependency health check",
-    description=(
-        "Reports the real state of each dependency. `status` is "
-        "`healthy` only when Redis and MinIO are both usable; otherwise "
-        "`degraded`. Contains no secrets."
-    ),
-)
+@app.get("/health", tags=["Health"], summary="Dependency health check")
 async def health() -> dict:
     redis_ok = await redis_service.ping()
     minio_ok = s3_service.bucket_ready or await s3_service.ensure_bucket()
-
     return {
         "status": "healthy" if (redis_ok and minio_ok) else "degraded",
         "environment": settings.environment,
         "dependencies": {
+            "database": {
+                "backend": (
+                    "supabase-postgresql"
+                    if settings.supabase_configured
+                    else "postgresql"
+                ),
+                "supabase_configured": settings.supabase_configured,
+            },
             "redis": {
                 "connected": redis_ok,
                 "channel": settings.redis_incident_channel,
-                # str() of a connection error, never a credential.
                 "error": None if redis_ok else redis_service.last_error,
             },
             "minio": {
@@ -152,7 +157,8 @@ async def health() -> dict:
                 "bucket": settings.minio_bucket,
                 "error": None if minio_ok else s3_service.last_error,
             },
-            "jwt": "available" if jwt_service.available else "unavailable (PyJWT missing)",
+            "jwt": "available" if jwt_service.available else "unavailable",
+            "postgis": "configured",
         },
         "websockets": {
             "connected_clients": ws_manager.connection_count,
@@ -163,18 +169,17 @@ async def health() -> dict:
             "photos": photo_store.backend,
             "photo_count": photo_store.count,
         },
-        # Tells the team at a glance whether Person 5A is wired in yet.
         "incident_integration": incident_adapter.mode,
     }
 
 
-# -- Routers --------------------------------------------------
-
+# Person 5B routers
 app.include_router(auth.router)
 app.include_router(upload.router)
 app.include_router(verification.router)
 app.include_router(websockets.router)
 
-# PERSON 5A: register your incident router here, e.g.
-#   from app.routers import incidents
-#   app.include_router(incidents.router)
+# Person 5A routers
+app.include_router(areas.router, prefix="/api/v1")
+app.include_router(incidents.router, prefix="/api/v1")
+app.include_router(dedupe.router, prefix="/api/v1")

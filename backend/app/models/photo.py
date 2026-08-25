@@ -48,7 +48,7 @@ class Photo(BaseModel):
     """
 
     id: UUID = Field(default_factory=uuid4)
-    incident_id: Optional[UUID] = Field(
+    incident_id: Optional[int] = Field(
         default=None,
         description="Incident this photo belongs to. FK once Person 5A's model exists.",
     )
@@ -57,6 +57,9 @@ class Photo(BaseModel):
     size_bytes: Optional[int] = None
     status: PhotoStatus = PhotoStatus.PENDING
     caption: Optional[str] = None
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+    captured_at: Optional[datetime] = None
     uploaded_by: Optional[UUID] = Field(
         default=None, description="User id of the uploader, when authenticated."
     )
@@ -78,12 +81,15 @@ class PhotoUploadMeta(BaseModel):
     Sent as multipart form fields, not JSON - see routers/upload.py.
     """
 
-    incident_id: Optional[UUID] = Field(
-        default=None, description="UUID of the incident this photo belongs to."
+    incident_id: Optional[int] = Field(
+        default=None, description="Integer ID of the incident this photo belongs to."
     )
     caption: Optional[str] = Field(
         default=None, max_length=280, description="Short description of the photo."
     )
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+    captured_at: Optional[datetime] = None
 
 
 # -- Response schemas -----------------------------------------
@@ -92,7 +98,7 @@ class PhotoOut(BaseModel):
     """Returned to the client after a successful upload."""
 
     id: UUID
-    incident_id: Optional[UUID] = None
+    incident_id: Optional[int] = None
     object_key: str
     # Plain str, not HttpUrl: presigned MinIO URLs are long and we do
     # not want Pydantic rejecting a URL the object store just handed us.
@@ -101,6 +107,9 @@ class PhotoOut(BaseModel):
     size_bytes: Optional[int] = None
     status: PhotoStatus = PhotoStatus.PENDING
     caption: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    captured_at: Optional[datetime] = None
     uploaded_by: Optional[UUID] = None
     uploaded_at: datetime
     verified_at: Optional[datetime] = None
