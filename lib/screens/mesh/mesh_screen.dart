@@ -8,12 +8,13 @@ import '../../mesh/mesh_message.dart';
 import '../../mesh/message_store.dart';
 import '../../mesh/sync_protocol.dart';
 import '../../theme/app_theme.dart';
+import 'cycle_test_screen.dart';
 
 /// Which side of the P2P group this device is playing.
 enum _MeshRole { none, host, client }
 
 /// How a sync-log line should be rendered.
-enum _LogKind { system, protocol, error }
+enum _LogKind { system, protocol, warn, error }
 
 /// One line in the on-screen sync log.
 class _LogEntry {
@@ -37,52 +38,79 @@ typedef _Check = Future<bool> Function();
 /// base class, but the package does not export that base type — so instead of
 /// duplicating the whole permission flow per role we bundle the method
 /// references and run one flow over them.
+///
+/// Field names mirror the plugin's method names exactly, because they are what
+/// gets printed into the sync log — a line reading `checkLocationEnabled =
+/// false` should be greppable straight back to the API that produced it.
 class _P2pGate {
   const _P2pGate({
-    required this.checkP2p,
-    required this.askP2p,
-    required this.checkBluetooth,
-    required this.askBluetooth,
-    required this.checkStorage,
-    required this.askStorage,
-    required this.enableWifi,
-    required this.enableLocation,
-    required this.enableBluetooth,
+    required this.checkP2pPermissions,
+    required this.askP2pPermissions,
+    required this.checkBluetoothPermissions,
+    required this.askBluetoothPermissions,
+    required this.checkStoragePermission,
+    required this.askStoragePermission,
+    required this.checkWifiEnabled,
+    required this.enableWifiServices,
+    required this.checkLocationEnabled,
+    required this.enableLocationServices,
+    required this.checkBluetoothEnabled,
+    required this.enableBluetoothServices,
   });
 
   factory _P2pGate.host(FlutterP2pHost host) => _P2pGate(
-        checkP2p: host.checkP2pPermissions,
-        askP2p: host.askP2pPermissions,
-        checkBluetooth: host.checkBluetoothPermissions,
-        askBluetooth: host.askBluetoothPermissions,
-        checkStorage: host.checkStoragePermission,
-        askStorage: host.askStoragePermission,
-        enableWifi: host.enableWifiServices,
-        enableLocation: host.enableLocationServices,
-        enableBluetooth: host.enableBluetoothServices,
+        checkP2pPermissions: host.checkP2pPermissions,
+        askP2pPermissions: host.askP2pPermissions,
+        checkBluetoothPermissions: host.checkBluetoothPermissions,
+        askBluetoothPermissions: host.askBluetoothPermissions,
+        checkStoragePermission: host.checkStoragePermission,
+        askStoragePermission: host.askStoragePermission,
+        checkWifiEnabled: host.checkWifiEnabled,
+        enableWifiServices: host.enableWifiServices,
+        checkLocationEnabled: host.checkLocationEnabled,
+        enableLocationServices: host.enableLocationServices,
+        checkBluetoothEnabled: host.checkBluetoothEnabled,
+        enableBluetoothServices: host.enableBluetoothServices,
       );
 
   factory _P2pGate.client(FlutterP2pClient client) => _P2pGate(
-        checkP2p: client.checkP2pPermissions,
-        askP2p: client.askP2pPermissions,
-        checkBluetooth: client.checkBluetoothPermissions,
-        askBluetooth: client.askBluetoothPermissions,
-        checkStorage: client.checkStoragePermission,
-        askStorage: client.askStoragePermission,
-        enableWifi: client.enableWifiServices,
-        enableLocation: client.enableLocationServices,
-        enableBluetooth: client.enableBluetoothServices,
+        checkP2pPermissions: client.checkP2pPermissions,
+        askP2pPermissions: client.askP2pPermissions,
+        checkBluetoothPermissions: client.checkBluetoothPermissions,
+        askBluetoothPermissions: client.askBluetoothPermissions,
+        checkStoragePermission: client.checkStoragePermission,
+        askStoragePermission: client.askStoragePermission,
+        checkWifiEnabled: client.checkWifiEnabled,
+        enableWifiServices: client.enableWifiServices,
+        checkLocationEnabled: client.checkLocationEnabled,
+        enableLocationServices: client.enableLocationServices,
+        checkBluetoothEnabled: client.checkBluetoothEnabled,
+        enableBluetoothServices: client.enableBluetoothServices,
       );
 
-  final _Check checkP2p;
-  final _Check askP2p;
-  final _Check checkBluetooth;
-  final _Check askBluetooth;
-  final _Check checkStorage;
-  final _Check askStorage;
-  final _Check enableWifi;
-  final _Check enableLocation;
-  final _Check enableBluetooth;
+  final _Check checkP2pPermissions;
+  final _Check askP2pPermissions;
+  final _Check checkBluetoothPermissions;
+  final _Check askBluetoothPermissions;
+  final _Check checkStoragePermission;
+  final _Check askStoragePermission;
+  final _Check checkWifiEnabled;
+  final _Check enableWifiServices;
+  final _Check checkLocationEnabled;
+  final _Check enableLocationServices;
+  final _Check checkBluetoothEnabled;
+  final _Check enableBluetoothServices;
+
+  /// The six read-only checks, in checklist order. Used by "Diagnose", which
+  /// must never prompt.
+  Map<String, _Check> get readOnlyChecks => <String, _Check>{
+        'checkP2pPermissions': checkP2pPermissions,
+        'checkBluetoothPermissions': checkBluetoothPermissions,
+        'checkStoragePermission': checkStoragePermission,
+        'checkWifiEnabled': checkWifiEnabled,
+        'checkLocationEnabled': checkLocationEnabled,
+        'checkBluetoothEnabled': checkBluetoothEnabled,
+      };
 }
 
 /// Offline mesh tab.
@@ -111,6 +139,14 @@ class _MeshScreenState extends State<MeshScreen> {
   /// Sync log is capped so a long demo cannot grow it without bound.
   static const int _maxLogLines = 500;
 
+  /// Compact style for the two secondary actions in a section header, so both
+  /// fit on a narrow phone. Still 48dp tall — the Material minimum.
+  static final ButtonStyle _headerButtonStyle = TextButton.styleFrom(
+    minimumSize: const Size(48, 48),
+    padding: const EdgeInsets.symmetric(horizontal: 10),
+    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+  );
+
   // --- connection state (unchanged behaviour) ---
   _MeshRole _role = _MeshRole.none;
   FlutterP2pHost? _host;
@@ -118,6 +154,16 @@ class _MeshScreenState extends State<MeshScreen> {
 
   final List<StreamSubscription<dynamic>> _subs =
       <StreamSubscription<dynamic>>[];
+
+  /// Kept out of [_subs] because it is torn down and re-created on every
+  /// reconnect, while the others live for the whole session.
+  StreamSubscription<String>? _textSub;
+
+  /// Host-side traffic generator, so a cycling client has something new to
+  /// collect on each pass.
+  Timer? _autoGenerateTimer;
+  bool _autoGenerate = false;
+  int _autoGenerateSeconds = 10;
   final List<_LogEntry> _log = <_LogEntry>[];
   final List<BleDiscoveredDevice> _devices = <BleDiscoveredDevice>[];
   List<P2pClientInfo> _peers = const <P2pClientInfo>[];
@@ -127,7 +173,13 @@ class _MeshScreenState extends State<MeshScreen> {
 
   bool _busy = false;
   bool _scanning = false;
+  bool _diagnosing = false;
   String? _statusLine;
+
+  /// Why the last host/join attempt was abandoned, shown as a banner until the
+  /// responder dismisses it or starts another attempt. The sync log keeps the
+  /// detail; this is the part you can read from arm's length.
+  String? _blockedReason;
 
   final ScrollController _logScroll = ScrollController();
 
@@ -154,6 +206,10 @@ class _MeshScreenState extends State<MeshScreen> {
 
   @override
   void dispose() {
+    _autoGenerateTimer?.cancel();
+    _autoGenerateTimer = null;
+    unawaited(_textSub?.cancel());
+    _textSub = null;
     for (final StreamSubscription<dynamic> sub in _subs) {
       unawaited(sub.cancel());
     }
@@ -201,44 +257,213 @@ class _MeshScreenState extends State<MeshScreen> {
 
   // --- permissions ---------------------------------------------------------
 
-  /// Runs the full permission + radio checklist. Returns `false` (and logs the
-  /// reason) as soon as something the mesh cannot work without is refused.
+  /// How long to wait after an `enable*Services()` call before re-checking.
+  ///
+  /// Those methods launch a system settings page and return immediately, so a
+  /// re-check in the same instant races the user and reads the old value. Two
+  /// seconds is enough for a toggle flip and the trip back.
+  static const Duration _settleAfterPrompt = Duration(seconds: 2);
+
+  void _gateLog(String line, [_LogKind kind = _LogKind.protocol]) =>
+      _addLog('[gate] $line', kind);
+
+  /// Logs one gate's state, prompts if it is unsatisfied, then logs it again.
+  ///
+  /// Returns the value of the check *after* any prompt, so the caller decides
+  /// whether an unsatisfied gate is fatal. Never throws: a gate that blows up
+  /// is logged and reported as false.
+  Future<bool> _runGate({
+    required String checkName,
+    required _Check check,
+    required String actionName,
+    required _Check action,
+    Duration settle = Duration.zero,
+  }) async {
+    bool before;
+    try {
+      before = await check();
+    } catch (e) {
+      _gateLog('$checkName threw: ${e.runtimeType}: $e', _LogKind.error);
+      return false;
+    }
+    _gateLog('$checkName = $before',
+        before ? _LogKind.protocol : _LogKind.warn);
+    if (before) return true;
+
+    _gateLog('calling $actionName...');
+    try {
+      await action();
+    } catch (e) {
+      _gateLog('$actionName threw: ${e.runtimeType}: $e', _LogKind.error);
+    }
+
+    if (settle > Duration.zero) {
+      _gateLog('waiting ${settle.inSeconds}s for the user to return...');
+      await Future<void>.delayed(settle);
+    }
+    if (!mounted) return false;
+
+    bool after;
+    try {
+      after = await check();
+    } catch (e) {
+      _gateLog('$checkName threw: ${e.runtimeType}: $e', _LogKind.error);
+      return false;
+    }
+    _gateLog('$checkName = $after (after)',
+        after ? _LogKind.protocol : _LogKind.warn);
+    return after;
+  }
+
+  /// Records a gate that could not be satisfied, and puts a banner on screen.
+  /// Always returns false so callers can `return _blockedBy(...)`.
+  bool _blockedBy(String checkName, String message) {
+    _gateLog('BLOCKED: $checkName still false after prompt', _LogKind.error);
+    if (mounted) setState(() => _blockedReason = message);
+    return false;
+  }
+
+  /// Runs the full permission + radio checklist, narrating every step into the
+  /// sync log. Returns `false` as soon as a gate the mesh cannot work without
+  /// stays unsatisfied after prompting.
   Future<bool> _ensurePermissions(_P2pGate gate) async {
     _setStatus('Checking permissions…');
+    _gateLog('--- checklist start ---');
 
-    if (!await gate.checkP2p() && !await gate.askP2p()) {
-      _addLog('Wi-Fi Direct permission denied.', _LogKind.error);
-      return false;
+    if (!await _runGate(
+      checkName: 'checkP2pPermissions',
+      check: gate.checkP2pPermissions,
+      actionName: 'askP2pPermissions',
+      action: gate.askP2pPermissions,
+    )) {
+      return _blockedBy('checkP2pPermissions',
+          'Wi-Fi Direct permission was refused. Grant it in Settings › Apps › '
+              'Samanvay Responder › Permissions, then try again.');
     }
-    if (!await gate.checkBluetooth() && !await gate.askBluetooth()) {
-      _addLog(
-          'Bluetooth permission denied — discovery needs BLE.', _LogKind.error);
-      return false;
+
+    if (!await _runGate(
+      checkName: 'checkBluetoothPermissions',
+      check: gate.checkBluetoothPermissions,
+      actionName: 'askBluetoothPermissions',
+      action: gate.askBluetoothPermissions,
+    )) {
+      return _blockedBy(
+          'checkBluetoothPermissions',
+          'Bluetooth permission was refused. Discovery needs BLE, so the mesh '
+              'cannot start without it.');
     }
+
     // Storage is only needed for file transfer, and on Android 13+ the legacy
-    // storage permission is always reported as denied. Ask once, never block.
-    if (!await gate.checkStorage()) {
-      final bool granted = await gate.askStorage();
-      if (!granted) {
-        _addLog('Storage permission not granted — file transfer unavailable.');
-      }
+    // storage permission is always reported as denied. Logged, never fatal —
+    // blocking on it would make the mesh unusable on the test devices.
+    if (!await _runGate(
+      checkName: 'checkStoragePermission',
+      check: gate.checkStoragePermission,
+      actionName: 'askStoragePermission',
+      action: gate.askStoragePermission,
+    )) {
+      _gateLog('storage unavailable — file transfer disabled (not fatal)',
+          _LogKind.warn);
     }
 
     _setStatus('Checking radios…');
-    if (!await gate.enableWifi()) {
-      _addLog('Wi-Fi is off. Turn it on and try again.', _LogKind.error);
-      return false;
+
+    if (!await _runGate(
+      checkName: 'checkWifiEnabled',
+      check: gate.checkWifiEnabled,
+      actionName: 'enableWifiServices',
+      action: gate.enableWifiServices,
+      settle: _settleAfterPrompt,
+    )) {
+      return _blockedBy('checkWifiEnabled',
+          'Wi-Fi is still off. Turn it on, then try again.');
     }
-    if (!await gate.enableLocation()) {
-      _addLog('Location services are off — Android needs them to scan.',
-          _LogKind.error);
-      return false;
+
+    if (!await _runGate(
+      checkName: 'checkLocationEnabled',
+      check: gate.checkLocationEnabled,
+      actionName: 'enableLocationServices',
+      action: gate.enableLocationServices,
+      settle: _settleAfterPrompt,
+    )) {
+      return _blockedBy(
+          'checkLocationEnabled',
+          'Location services are still off. Android will not scan for peers '
+              'without them.');
     }
-    if (!await gate.enableBluetooth()) {
-      _addLog('Bluetooth is off. Turn it on and try again.', _LogKind.error);
-      return false;
+
+    if (!await _runGate(
+      checkName: 'checkBluetoothEnabled',
+      check: gate.checkBluetoothEnabled,
+      actionName: 'enableBluetoothServices',
+      action: gate.enableBluetoothServices,
+      settle: _settleAfterPrompt,
+    )) {
+      return _blockedBy('checkBluetoothEnabled',
+          'Bluetooth is still off. Turn it on, then try again.');
     }
+
+    _gateLog('--- checklist passed ---');
     return true;
+  }
+
+  // --- diagnostics ---------------------------------------------------------
+
+  /// A gate for read-only checks.
+  ///
+  /// Prefers the live host/client so diagnostics report on the same instance
+  /// the session uses. With nothing connected it builds a throwaway
+  /// [FlutterP2pHost]: the plugin explicitly allows all six checks before
+  /// `initialize()` (the native side spins up minimal managers for them), and
+  /// nothing native is allocated.
+  ///
+  /// The throwaway is deliberately NOT disposed — `FlutterP2pHost.dispose()`
+  /// calls `removeGroup()` against the shared platform singleton, which would
+  /// tear down a live session belonging to someone else.
+  _P2pGate _diagnosticGate() {
+    final FlutterP2pHost? host = _host;
+    if (host != null) return _P2pGate.host(host);
+    final FlutterP2pClient? client = _client;
+    if (client != null) return _P2pGate.client(client);
+    return _P2pGate.host(FlutterP2pHost(username: _callSign));
+  }
+
+  /// Reports all six gates without prompting for anything.
+  ///
+  /// Read-only on purpose: this is for seeing the true state of the device
+  /// without a permission dialog changing it out from under you.
+  Future<void> _runDiagnostics() async {
+    if (_diagnosing) return;
+    setState(() => _diagnosing = true);
+    _gateLog('--- diagnostics (read-only, no prompts) ---');
+
+    try {
+      final _P2pGate gate = _diagnosticGate();
+      int failing = 0;
+
+      for (final MapEntry<String, _Check> entry
+          in gate.readOnlyChecks.entries) {
+        try {
+          final bool value = await entry.value();
+          if (!value) failing++;
+          _gateLog('${entry.key} = $value',
+              value ? _LogKind.protocol : _LogKind.warn);
+        } catch (e) {
+          failing++;
+          _gateLog('${entry.key} threw: ${e.runtimeType}: $e', _LogKind.error);
+        }
+        if (!mounted) return;
+      }
+
+      _gateLog(
+        failing == 0
+            ? '--- diagnostics: all 6 gates OK ---'
+            : '--- diagnostics: $failing of 6 gate(s) not satisfied ---',
+        failing == 0 ? _LogKind.protocol : _LogKind.warn,
+      );
+    } finally {
+      if (mounted) setState(() => _diagnosing = false);
+    }
   }
 
   // --- host ----------------------------------------------------------------
@@ -248,6 +473,7 @@ class _MeshScreenState extends State<MeshScreen> {
     setState(() {
       _busy = true;
       _role = _MeshRole.host;
+      _blockedReason = null;
     });
 
     final FlutterP2pHost host = FlutterP2pHost(username: _callSign);
@@ -263,7 +489,22 @@ class _MeshScreenState extends State<MeshScreen> {
       }
 
       _setStatus('Creating group…');
-      final HotspotHostState state = await host.createGroup(advertise: true);
+      final HotspotHostState state;
+      try {
+        state = await host.createGroup(advertise: true);
+      } catch (e) {
+        // The usual causes are a TimeoutException (the hotspot never came up
+        // with an IP) or a PlatformException from the Wi-Fi Direct stack. The
+        // type is as diagnostic as the message, so log both.
+        _addLog('! createGroup failed: ${e.runtimeType}: $e', _LogKind.error);
+        if (mounted) {
+          setState(() => _blockedReason =
+              'Could not create the Wi-Fi Direct group. See the sync log for '
+                  'the exact error.');
+        }
+        await _teardown();
+        return;
+      }
       if (!mounted) return;
       setState(() => _hostState = state);
       _addLog('Group up — SSID ${state.ssid ?? "?"} '
@@ -282,11 +523,8 @@ class _MeshScreenState extends State<MeshScreen> {
           _onClientListChanged,
           onError: (Object e) =>
               _addLog('Client list error: $e', _LogKind.error),
-        ))
-        ..add(host.streamReceivedTexts().listen(
-          _enqueueFrame,
-          onError: (Object e) => _addLog('Receive error: $e', _LogKind.error),
         ));
+      _bindReceivedTexts();
 
       _setStatus(null);
     } catch (e) {
@@ -328,6 +566,7 @@ class _MeshScreenState extends State<MeshScreen> {
     setState(() {
       _busy = true;
       _role = _MeshRole.client;
+      _blockedReason = null;
     });
 
     final FlutterP2pClient client = FlutterP2pClient(username: _callSign);
@@ -357,11 +596,9 @@ class _MeshScreenState extends State<MeshScreen> {
           },
           onError: (Object e) =>
               _addLog('Client list error: $e', _LogKind.error),
-        ))
-        ..add(client.streamReceivedTexts().listen(
-          _enqueueFrame,
-          onError: (Object e) => _addLog('Receive error: $e', _LogKind.error),
         ));
+      // Bound again after every connect — see _bindReceivedTexts.
+      _bindReceivedTexts();
 
       await _startScan();
       _setStatus(null);
@@ -407,7 +644,10 @@ class _MeshScreenState extends State<MeshScreen> {
     final FlutterP2pClient? client = _client;
     if (client == null || _busy) return;
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _blockedReason = null;
+    });
     final String name =
         device.deviceName.isEmpty ? device.deviceAddress : device.deviceName;
     _setStatus('Connecting to $name…');
@@ -415,7 +655,21 @@ class _MeshScreenState extends State<MeshScreen> {
     try {
       await client.stopScan();
       if (mounted) setState(() => _scanning = false);
-      await client.connectWithDevice(device);
+
+      try {
+        await client.connectWithDevice(device);
+      } catch (e) {
+        // BLE credential exchange and the Wi-Fi join both surface here; the
+        // exception type separates a timeout from a refused connection.
+        _addLog('! connectWithDevice failed: ${e.runtimeType}: $e',
+            _LogKind.error);
+        if (mounted) {
+          setState(() => _blockedReason =
+              'Could not connect to $name. See the sync log for the exact '
+                  'error, or run Diagnose to check the radios.');
+        }
+        return;
+      }
       _addLog('Connected to $name.');
 
       // Same settle as the host side, for the same reason.
@@ -423,7 +677,8 @@ class _MeshScreenState extends State<MeshScreen> {
       if (!mounted) return;
       await _kickOffSync('connected');
     } catch (e) {
-      _addLog('Connection to $name failed: $e', _LogKind.error);
+      _addLog('Connection to $name failed: ${e.runtimeType}: $e',
+          _LogKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
       _setStatus(null);
@@ -445,6 +700,35 @@ class _MeshScreenState extends State<MeshScreen> {
       case _MeshRole.none:
         return;
     }
+  }
+
+  /// (Re-)subscribes to the transport's received-text stream.
+  ///
+  /// This has to be callable more than once. `streamReceivedTexts()` binds to
+  /// the transport's stream once via `yield*` and completes for good when
+  /// `disconnect()` disposes that transport — so a subscription taken at join
+  /// time is dead after the first disconnect, and every later reconnect would
+  /// deliver nothing into the store. Anything that reconnects (the cycle
+  /// tester, and any future auto-reconnect) must call this afterwards.
+  ///
+  /// Safe to call when the transport is not up yet: the plugin's generator
+  /// polls until one exists, and the previous subscription is cancelled here
+  /// so at most one is ever live.
+  void _bindReceivedTexts() {
+    unawaited(_textSub?.cancel());
+    _textSub = null;
+
+    final Stream<String>? texts = switch (_role) {
+      _MeshRole.host => _host?.streamReceivedTexts(),
+      _MeshRole.client => _client?.streamReceivedTexts(),
+      _MeshRole.none => null,
+    };
+    if (texts == null) return;
+
+    _textSub = texts.listen(
+      _enqueueFrame,
+      onError: (Object e) => _addLog('Receive error: $e', _LogKind.error),
+    );
   }
 
   /// Queues one inbound frame for in-order handling.
@@ -484,12 +768,40 @@ class _MeshScreenState extends State<MeshScreen> {
     await _kickOffSync('manual');
   }
 
+  /// Turns the host-side traffic generator on or off.
+  ///
+  /// Without it a cycling client reconnects to a store that has not changed,
+  /// so `messagesGained` is 0 every pass and proves nothing. With it, each
+  /// cycle has something genuinely new to carry.
+  void _setAutoGenerate({bool? enabled, int? seconds}) {
+    setState(() {
+      if (enabled != null) _autoGenerate = enabled;
+      if (seconds != null) _autoGenerateSeconds = seconds;
+    });
+
+    _autoGenerateTimer?.cancel();
+    _autoGenerateTimer = null;
+
+    if (!_autoGenerate || _role != _MeshRole.host) {
+      if (enabled == false) _addLog('auto-generate off');
+      return;
+    }
+
+    _autoGenerateTimer =
+        Timer.periodic(Duration(seconds: _autoGenerateSeconds), (_) {
+      if (!mounted) return;
+      unawaited(_createTestMessage(auto: true));
+    });
+    _addLog('auto-generate on — one ${_draftType.wireName} '
+        'every ${_autoGenerateSeconds}s');
+  }
+
   /// Creates a message locally and pushes it straight out as a MSG frame.
   ///
   /// Works while disconnected on purpose: the message lands in the store and
   /// goes across at the next digest exchange. That is the store-and-forward
   /// behaviour this screen exists to demonstrate.
-  Future<void> _createTestMessage() async {
+  Future<void> _createTestMessage({bool auto = false}) async {
     final MeshMessageType type = _draftType;
     final MeshMessage message = MeshMessage.create(
       type: type.wireName,
@@ -499,12 +811,13 @@ class _MeshScreenState extends State<MeshScreen> {
       // button and the duty-status control. This is filler for testing.
       payload: <String, dynamic>{
         'note': 'Test ${type.label} from ${DeviceIdentity.shortDeviceId}',
+        'auto': auto,
       },
     );
 
     _store.add(message);
-    _addLog('created ${message.type} p${message.priority} '
-        '#${DeviceIdentity.shorten(message.id)}');
+    _addLog('${auto ? 'auto-created' : 'created'} ${message.type} '
+        'p${message.priority} #${DeviceIdentity.shorten(message.id)}');
 
     if (!_isLive) {
       _addLog('offline — held in store, will sync on next contact');
@@ -520,9 +833,57 @@ class _MeshScreenState extends State<MeshScreen> {
     }
   }
 
+  // --- cycle test ----------------------------------------------------------
+
+  /// Opens the cycle-test harness.
+  ///
+  /// It drives this screen's client through repeated connect/disconnect, so it
+  /// needs one that has already been initialised — that only exists after
+  /// "Join as client". Hosting cannot be cycle-tested from this side: the host
+  /// is the fixed end of the pair.
+  Future<void> _openCycleTest() async {
+    final FlutterP2pClient? client = _client;
+    if (client == null) {
+      _addLog('cycle test needs a client — tap "Join as client" first');
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Tap "Join as client" first — the cycle test '
+                'drives the client side.'),
+          ),
+        );
+      return;
+    }
+
+    // Hand over the hosts already discovered. One target repeats the same
+    // host; several alternate round-robin with no other change.
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => CycleTestScreen(
+          client: client,
+          store: _store,
+          protocol: _sync,
+          onConnected: () async => _bindReceivedTexts(),
+          knownTargets: List<BleDiscoveredDevice>.of(_devices),
+        ),
+      ),
+    );
+
+    // The tester leaves the radio disconnected; make sure this screen's own
+    // subscription is live again for normal use.
+    if (!mounted) return;
+    _bindReceivedTexts();
+    _addLog('returned from cycle test — store holds ${_store.count} message(s)');
+  }
+
   // --- teardown ------------------------------------------------------------
 
   Future<void> _teardown() async {
+    _autoGenerateTimer?.cancel();
+    _autoGenerateTimer = null;
+    await _textSub?.cancel();
+    _textSub = null;
     for (final StreamSubscription<dynamic> sub in _subs) {
       await sub.cancel();
     }
@@ -545,6 +906,7 @@ class _MeshScreenState extends State<MeshScreen> {
       _scanning = false;
       _statusLine = null;
       _busy = false;
+      _autoGenerate = false;
     });
     // The store deliberately survives: messages outlive connections.
     _addLog('left the mesh — ${_store.count} message(s) retained');
@@ -570,6 +932,12 @@ class _MeshScreenState extends State<MeshScreen> {
           ],
         ),
         actions: <Widget>[
+          IconButton(
+            iconSize: 26,
+            tooltip: 'Cycle test',
+            icon: const Icon(Icons.loop),
+            onPressed: _busy ? null : _openCycleTest,
+          ),
           if (_role != _MeshRole.none)
             IconButton(
               iconSize: 28,
@@ -608,6 +976,7 @@ class _MeshScreenState extends State<MeshScreen> {
             minHeight: 3,
             backgroundColor: AppColors.surfaceVariant,
           ),
+        if (_blockedReason != null) _buildBlockedBanner(_blockedReason!),
         if (showDevices) ...<Widget>[
           _buildDeviceList(),
           const Divider(height: 1),
@@ -617,6 +986,44 @@ class _MeshScreenState extends State<MeshScreen> {
         Expanded(flex: 4, child: _buildLogSection()),
         _buildComposer(),
       ],
+    );
+  }
+
+  /// Why the last attempt stopped, in plain language. Stays up until it is
+  /// dismissed or another attempt starts — a snackbar would be gone before
+  /// someone looking at the phone had read it.
+  Widget _buildBlockedBanner(String reason) {
+    final TextTheme text = Theme.of(context).textTheme;
+    return Container(
+      width: double.infinity,
+      color: AppColors.p0.withValues(alpha: 0.14),
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Icon(Icons.block, color: AppColors.p0, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Blocked',
+                  style: text.titleMedium?.copyWith(color: AppColors.p0),
+                ),
+                const SizedBox(height: 4),
+                Text(reason, style: text.bodyMedium),
+              ],
+            ),
+          ),
+          IconButton(
+            iconSize: 22,
+            tooltip: 'Dismiss',
+            icon: const Icon(Icons.close, color: AppColors.textSecondary),
+            onPressed: () => setState(() => _blockedReason = null),
+          ),
+        ],
+      ),
     );
   }
 
@@ -831,10 +1238,27 @@ class _MeshScreenState extends State<MeshScreen> {
       children: <Widget>[
         _SectionHeader(
           title: 'SYNC LOG',
-          trailing: TextButton.icon(
-            onPressed: _busy ? null : _syncNow,
-            icon: const Icon(Icons.sync, size: 20),
-            label: const Text('Sync now'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              // Read-only: runs the six check* calls and nothing else, so it
+              // is always safe to press, connected or not.
+              Tooltip(
+                message: 'Run the six permission/radio checks, read-only',
+                child: TextButton.icon(
+                  style: _headerButtonStyle,
+                  onPressed: _diagnosing ? null : _runDiagnostics,
+                  icon: const Icon(Icons.troubleshoot, size: 18),
+                  label: const Text('Diagnose'),
+                ),
+              ),
+              TextButton.icon(
+                style: _headerButtonStyle,
+                onPressed: _busy ? null : _syncNow,
+                icon: const Icon(Icons.sync, size: 18),
+                label: const Text('Sync now'),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -860,6 +1284,53 @@ class _MeshScreenState extends State<MeshScreen> {
 
   // --- composer ------------------------------------------------------------
 
+  /// `[⚡] Auto-generate   [10s ▾]   [switch]`
+  Widget _buildAutoGenerateRow(TextTheme text) {
+    const List<int> intervals = <int>[5, 10, 20, 30, 60];
+
+    return Row(
+      children: <Widget>[
+        Icon(
+          Icons.bolt,
+          size: 20,
+          color: _autoGenerate ? AppColors.p2 : AppColors.textSecondary,
+        ),
+        const SizedBox(width: 8),
+        // Expanded so the label yields rather than overflowing at a large
+        // system font scale.
+        Expanded(
+          child: Text(
+            'Auto-generate',
+            style: text.bodyMedium,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        DropdownButton<int>(
+          value: _autoGenerateSeconds,
+          underline: const SizedBox.shrink(),
+          dropdownColor: AppColors.surfaceVariant,
+          onChanged: (int? value) {
+            if (value == null) return;
+            _setAutoGenerate(seconds: value);
+          },
+          items: intervals
+              .map((int s) => DropdownMenuItem<int>(
+                    value: s,
+                    child: Text('${s}s', style: text.bodyMedium),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(width: 4),
+        Switch(
+          value: _autoGenerate,
+          onChanged: (bool v) => _setAutoGenerate(enabled: v),
+        ),
+      ],
+    );
+  }
+
   Widget _buildComposer() {
     final TextTheme text = Theme.of(context).textTheme;
 
@@ -874,6 +1345,13 @@ class _MeshScreenState extends State<MeshScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            // Host-only: gives a cycling client new traffic to collect, so
+            // messagesGained proves a real transfer rather than an empty
+            // reconnect.
+            if (_role == _MeshRole.host) ...<Widget>[
+              _buildAutoGenerateRow(text),
+              const Divider(height: 20),
+            ],
             Text('CREATE TEST MESSAGE',
                 style: text.bodySmall?.copyWith(letterSpacing: 1.2)),
             const SizedBox(height: 8),
@@ -954,20 +1432,25 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 44,
+      height: 48,
       width: double.infinity,
       color: AppColors.surfaceVariant,
       padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
       child: Row(
         children: <Widget>[
-          Text(
-            title,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(letterSpacing: 1.2, color: AppColors.textPrimary),
+          // The title yields space rather than the actions: at a large system
+          // font scale the buttons must stay whole and tappable, and "STORE
+          // (12)" degrades acceptably to an ellipsis.
+          Expanded(
+            child: Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(letterSpacing: 1.2, color: AppColors.textPrimary),
+            ),
           ),
-          const Spacer(),
           ?trailing,
         ],
       ),
@@ -1050,6 +1533,8 @@ class _LogRow extends StatelessWidget {
     switch (entry.kind) {
       case _LogKind.error:
         return AppColors.p0;
+      case _LogKind.warn:
+        return AppColors.p1;
       case _LogKind.system:
         return AppColors.textSecondary;
       case _LogKind.protocol:

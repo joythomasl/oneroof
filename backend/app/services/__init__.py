@@ -1,1 +1,1 @@
-# Services package
+"""ONE ROOF application services."""

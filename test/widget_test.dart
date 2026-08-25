@@ -7,7 +7,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:flutter_p2p_connection/flutter_p2p_connection.dart';
 import 'package:oneroof/main.dart';
+import 'package:oneroof/mesh/message_store.dart';
+import 'package:oneroof/mesh/sync_protocol.dart';
+import 'package:oneroof/screens/mesh/cycle_test_screen.dart';
 import 'package:oneroof/theme/app_theme.dart';
 
 void main() {
@@ -20,6 +24,58 @@ void main() {
     expect(find.text('Profile'), findsWidgets);
 
     // Unmount so HomeScreen's periodic timer is cancelled before teardown.
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('mesh screen lays out on a POCO M6 5G without overflow',
+      (WidgetTester tester) async {
+    // 1080x2400 at 2.75x — the target device. The Store/Sync log section
+    // headers each carry two buttons, so they are the tightest rows in the
+    // app; this catches a regression there before it reaches a phone.
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.75;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const SamanvayApp());
+    await tester.tap(find.byIcon(Icons.hub_outlined));
+    await tester.pump();
+
+    expect(find.text('Diagnose'), findsOneWidget);
+    expect(find.text('Sync now'), findsOneWidget);
+    expect(find.text('STORE (0)'), findsOneWidget);
+    expect(find.text('SYNC LOG'), findsOneWidget);
+    // A RenderFlex overflow would surface here.
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('cycle test screen lays out on a POCO M6 5G without overflow',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.75;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    // Constructing the client is inert — nothing touches a platform channel
+    // until the run starts, and this test never presses Start.
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark,
+      home: CycleTestScreen(
+        client: FlutterP2pClient(),
+        store: MessageStore(),
+        protocol: const SyncProtocol(),
+        onConnected: () async {},
+      ),
+    ));
+    await tester.pump();
+
+    expect(find.text('Start'), findsOneWidget);
+    expect(find.text('Cycles'), findsOneWidget);
+    expect(find.text('CONNECT'), findsOneWidget); // table header
+    expect(tester.takeException(), isNull);
+
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

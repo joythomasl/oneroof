@@ -1,32 +1,84 @@
-"""
-Person 5A — Configuration
-Environment-based settings for database and deduplication parameters.
-"""
+"""Central configuration for the combined ONE ROOF backend."""
 
-import os
-from pydantic_settings import BaseSettings
+from __future__ import annotations
+
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """Read configuration from environment variables or ``.env``."""
 
-    # ── Database ──────────────────────────────────────────────
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    app_name: str = "One Roof API"
+    environment: str = "development"
+    debug: bool = False
+
     DATABASE_URL: str = "postgresql://oneroof:oneroof@localhost:5432/oneroof"
-
-    # ── Deduplication ─────────────────────────────────────────
     DEDUPE_RADIUS_METERS: float = 500.0
     DEDUPE_TIME_WINDOW_MINUTES: int = 30
 
-    # ── App ───────────────────────────────────────────────────
-    APP_NAME: str = "OneRoof — Spatial & Data Core"
-    DEBUG: bool = False
+    otp_expiry_seconds: int = 300
+    otp_length: int = 6
+    otp_print_to_console: bool = True
+    jwt_secret_key: str = "change_this_in_production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 1440
 
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-        "extra": "ignore",
-    }
+    minio_endpoint: str = "http://localhost:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_bucket: str = "oneroof-uploads"
+    minio_region: str = "us-east-1"
+    minio_use_presigned_urls: bool = True
+    minio_presign_expiry_seconds: int = 3600
+
+    redis_url: str = "redis://localhost:6379/0"
+    redis_incident_channel: str = "incident_updates"
+    max_upload_size_mb: int = 10
+
+    @property
+    def is_development(self) -> bool:
+        return self.environment.lower() in {"development", "dev", "local"}
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.max_upload_size_mb * 1024 * 1024
+
+    @property
+    def APP_NAME(self) -> str:
+        return self.app_name
+
+    @property
+    def DEBUG(self) -> bool:
+        return self.debug
+
+    @property
+    def s3_endpoint_url(self) -> str:
+        return self.minio_endpoint
+
+    @property
+    def s3_access_key(self) -> str:
+        return self.minio_access_key
+
+    @property
+    def s3_secret_key(self) -> str:
+        return self.minio_secret_key
+
+    @property
+    def s3_bucket_name(self) -> str:
+        return self.minio_bucket
+
+    @property
+    def s3_region(self) -> str:
+        return self.minio_region
 
 
 @lru_cache()

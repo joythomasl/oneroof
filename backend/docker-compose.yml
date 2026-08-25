@@ -1,12 +1,10 @@
-# Person 5A — Docker Compose
-# Only includes services required by Person 5A (PostGIS + API).
-# Person 5B will add MinIO, Redis, etc. during merge.
+# ONE ROOF - Combined local infrastructure for Person 5A and Person 5B
 
 services:
-  # ── PostgreSQL + PostGIS ──────────────────────────────────
   postgis:
     image: postgis/postgis:16-3.4
     container_name: oneroof-postgis
+    restart: unless-stopped
     environment:
       POSTGRES_DB: oneroof
       POSTGRES_USER: oneroof
@@ -14,23 +12,79 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U oneroof -d oneroof"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # ── FastAPI (Person 5A) ───────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: oneroof-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  minio:
+    image: minio/minio:latest
+    container_name: oneroof-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: oneroof-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-oneroof-uploads}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $$MINIO_ACCESS_KEY $$MINIO_SECRET_KEY &&
+      mc mb --ignore-existing local/$$MINIO_BUCKET
+      "
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: oneroof-api
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://oneroof:oneroof@postgis:5432/oneroof
-      DEDUPE_RADIUS_METERS: 500
-      DEDUPE_TIME_WINDOW_MINUTES: 30
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-oneroof-uploads}
       DEBUG: "true"
     ports:
       - "8000:8000"
@@ -39,6 +93,12 @@ services:
     depends_on:
       postgis:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
 volumes:
-  pgdata:
+  postgres-data:
+  redis-data:
+  minio-data:

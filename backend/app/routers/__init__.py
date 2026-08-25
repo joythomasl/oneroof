@@ -1,1 +1,1 @@
-# Routers package
+"""ONE ROOF API routers."""
