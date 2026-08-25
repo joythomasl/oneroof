@@ -1,7 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
+import '../../mesh/device_identity.dart';
+import '../../mesh/mesh_message.dart';
+import '../../mesh/report_store.dart';
+import '../create_request/create_request_screen.dart';
 import '../../theme/app_theme.dart';
 
 /// Duty status the responder reports to the coordination centre.
@@ -13,7 +18,11 @@ enum DutyStatus {
   enRoute('En Route', Icons.directions_run, AppColors.info),
   engaged('Engaged', Icons.local_fire_department_outlined, AppColors.p1),
   resting('Resting', Icons.bedtime_outlined, AppColors.p2),
-  offDuty('Off Duty', Icons.do_not_disturb_on_outlined, AppColors.textSecondary);
+  offDuty(
+    'Off Duty',
+    Icons.do_not_disturb_on_outlined,
+    AppColors.textSecondary,
+  );
 
   const DutyStatus(this.label, this.icon, this.color);
 
@@ -22,7 +31,8 @@ enum DutyStatus {
   final Color color;
 
   /// Next status in the cycle, wrapping back to [available] at the end.
-  DutyStatus get next => DutyStatus.values[(index + 1) % DutyStatus.values.length];
+  DutyStatus get next =>
+      DutyStatus.values[(index + 1) % DutyStatus.values.length];
 }
 
 class HomeScreen extends StatefulWidget {
@@ -41,8 +51,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// When the current emergency was declared. Hardcoded to "a few hours ago"
   /// so the elapsed timer shows something meaningful during testing.
-  late final DateTime _declaredAt =
-      DateTime.now().subtract(const Duration(hours: 6, minutes: 42));
+  late final DateTime _declaredAt = DateTime.now().subtract(
+    const Duration(hours: 6, minutes: 42),
+  );
 
   DutyStatus _status = DutyStatus.available;
   Timer? _ticker;
@@ -70,9 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // it. When offline this should queue and also broadcast over the mesh.
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text('Status set to ${_status.label}')),
-      );
+      ..showSnackBar(SnackBar(content: Text('Status set to ${_status.label}')));
   }
 
   static String _formatElapsed(Duration d) {
@@ -117,26 +126,131 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 16),
           _DutyStatusCard(status: _status, onCycle: _cycleStatus),
           const SizedBox(height: 16),
-          Text('QUICK ACTIONS',
-              style: text.bodySmall?.copyWith(letterSpacing: 1.2)),
+          Text(
+            'QUICK ACTIONS',
+            style: text.bodySmall?.copyWith(letterSpacing: 1.2),
+          ),
           const SizedBox(height: 8),
-          // TODO(backend): wire these to the report-submission and SOS
-          // endpoints. Both must fall back to the mesh when there is no uplink.
-          const _QuickAction(
+          _QuickAction(
             icon: Icons.add_alert_outlined,
             label: 'File new report',
             subtitle: 'Casualty, hazard, resource request',
+            onTap: _openCreateRequest,
           ),
           const SizedBox(height: 8),
-          const _QuickAction(
-            icon: Icons.sos_outlined,
-            label: 'Responder SOS',
-            subtitle: 'Broadcast own-safety alert to all units',
-            tint: AppColors.p0,
+          Text(
+            'QUICK REPORT — P0',
+            style: text.bodySmall?.copyWith(letterSpacing: 1.2),
+          ),
+          const SizedBox(height: 8),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 2.6,
+            children: <Widget>[
+              _quickReportButton(
+                'trapped',
+                'Trapped',
+                Icons.person_pin_circle_outlined,
+              ),
+              _quickReportButton(
+                'fire',
+                'Fire',
+                Icons.local_fire_department_outlined,
+              ),
+              _quickReportButton('flooding', 'Flood', Icons.water_outlined),
+              _quickReportButton(
+                'medical',
+                'Medical',
+                Icons.medical_services_outlined,
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _openCreateRequest() async {
+    final CreateRequestResult? result = await Navigator.of(context)
+        .push<CreateRequestResult>(
+          MaterialPageRoute<CreateRequestResult>(
+            builder: (_) => CreateRequestScreen(areaState: _areaState),
+          ),
+        );
+    if (!mounted || result == null) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'Report #${DeviceIdentity.shorten(result.reportId)} queued for next mesh sync',
+          ),
+        ),
+      );
+  }
+
+  Widget _quickReportButton(String type, String label, IconData icon) =>
+      OutlinedButton.icon(
+        icon: Icon(icon, color: AppColors.p0),
+        label: Text(label),
+        onPressed: () => _fileQuickReport(type, label),
+      );
+
+  Future<void> _fileQuickReport(String incidentType, String label) async {
+    Position? position;
+    try {
+      if (await Geolocator.isLocationServiceEnabled()) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission != LocationPermission.denied &&
+            permission != LocationPermission.deniedForever) {
+          position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      // A P0 must be able to leave the device even when GPS is unavailable.
+    }
+    if (!mounted) return;
+    final MeshMessage report = MeshMessage.create(
+      type: MeshMessageType.incidentReport.wireName,
+      originDevice: DeviceIdentity.deviceId,
+      originUser: DeviceIdentity.userId,
+      priority: 0,
+      payload: <String, dynamic>{
+        'incidentType': incidentType,
+        'severity': 'P0',
+        'description': '',
+        'language': 'English',
+        'lat': position?.latitude,
+        'lng': position?.longitude,
+        'gpsAccuracy': position?.accuracy,
+        'capturedAt': DateTime.now().toUtc().toIso8601String(),
+        'photoSha256': null,
+        'photoFilename': null,
+        'photoSizeBytes': null,
+        'thumbnailBase64': null,
+      },
+    );
+    reportStore.add(report);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            '$label P0 #${DeviceIdentity.shorten(report.id)} queued for mesh sync',
+          ),
+        ),
+      );
   }
 }
 
@@ -165,7 +279,10 @@ class _AreaStateCard extends StatelessWidget {
           children: <Widget>[
             Row(
               children: <Widget>[
-                StatusBadge.areaState(areaState, icon: Icons.warning_amber_rounded),
+                StatusBadge.areaState(
+                  areaState,
+                  icon: Icons.warning_amber_rounded,
+                ),
                 const Spacer(),
                 Text(incidentCode, style: text.bodySmall),
               ],
@@ -177,8 +294,11 @@ class _AreaStateCard extends StatelessWidget {
             const SizedBox(height: 14),
             Row(
               children: <Widget>[
-                const Icon(Icons.timer_outlined,
-                    size: 20, color: AppColors.textSecondary),
+                const Icon(
+                  Icons.timer_outlined,
+                  size: 20,
+                  color: AppColors.textSecondary,
+                ),
                 const SizedBox(width: 10),
                 Text('Elapsed', style: text.bodyMedium),
                 const Spacer(),
@@ -218,8 +338,10 @@ class _DutyStatusCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('YOUR STATUS',
-                style: text.bodySmall?.copyWith(letterSpacing: 1.2)),
+            Text(
+              'YOUR STATUS',
+              style: text.bodySmall?.copyWith(letterSpacing: 1.2),
+            ),
             const SizedBox(height: 12),
             Row(
               children: <Widget>[
@@ -264,35 +386,29 @@ class _QuickAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.subtitle,
-    this.tint,
+    required this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String subtitle;
-  final Color? tint;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final Color color = tint ?? AppColors.textPrimary;
+    const Color color = AppColors.textPrimary;
     return Card(
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Icon(icon, size: 30, color: color),
         title: Text(
           label,
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium
+          style: Theme.of(context).textTheme.titleMedium
               ?.copyWith(color: color),
         ),
         subtitle: Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(SnackBar(content: Text('$label — not wired yet')));
-        },
+        onTap: onTap,
       ),
     );
   }

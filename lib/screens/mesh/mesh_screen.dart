@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_p2p_connection/flutter_p2p_connection.dart';
@@ -8,6 +9,7 @@ import '../../mesh/connection_manager.dart';
 import '../../mesh/device_identity.dart';
 import '../../mesh/mesh_message.dart';
 import '../../mesh/message_store.dart';
+import '../../mesh/report_store.dart';
 import '../../mesh/sync_protocol.dart';
 import '../../theme/app_theme.dart';
 import 'bridge_screen.dart';
@@ -62,34 +64,34 @@ class _P2pGate {
   });
 
   factory _P2pGate.host(FlutterP2pHost host) => _P2pGate(
-        checkP2pPermissions: host.checkP2pPermissions,
-        askP2pPermissions: host.askP2pPermissions,
-        checkBluetoothPermissions: host.checkBluetoothPermissions,
-        askBluetoothPermissions: host.askBluetoothPermissions,
-        checkStoragePermission: host.checkStoragePermission,
-        askStoragePermission: host.askStoragePermission,
-        checkWifiEnabled: host.checkWifiEnabled,
-        enableWifiServices: host.enableWifiServices,
-        checkLocationEnabled: host.checkLocationEnabled,
-        enableLocationServices: host.enableLocationServices,
-        checkBluetoothEnabled: host.checkBluetoothEnabled,
-        enableBluetoothServices: host.enableBluetoothServices,
-      );
+    checkP2pPermissions: host.checkP2pPermissions,
+    askP2pPermissions: host.askP2pPermissions,
+    checkBluetoothPermissions: host.checkBluetoothPermissions,
+    askBluetoothPermissions: host.askBluetoothPermissions,
+    checkStoragePermission: host.checkStoragePermission,
+    askStoragePermission: host.askStoragePermission,
+    checkWifiEnabled: host.checkWifiEnabled,
+    enableWifiServices: host.enableWifiServices,
+    checkLocationEnabled: host.checkLocationEnabled,
+    enableLocationServices: host.enableLocationServices,
+    checkBluetoothEnabled: host.checkBluetoothEnabled,
+    enableBluetoothServices: host.enableBluetoothServices,
+  );
 
   factory _P2pGate.client(FlutterP2pClient client) => _P2pGate(
-        checkP2pPermissions: client.checkP2pPermissions,
-        askP2pPermissions: client.askP2pPermissions,
-        checkBluetoothPermissions: client.checkBluetoothPermissions,
-        askBluetoothPermissions: client.askBluetoothPermissions,
-        checkStoragePermission: client.checkStoragePermission,
-        askStoragePermission: client.askStoragePermission,
-        checkWifiEnabled: client.checkWifiEnabled,
-        enableWifiServices: client.enableWifiServices,
-        checkLocationEnabled: client.checkLocationEnabled,
-        enableLocationServices: client.enableLocationServices,
-        checkBluetoothEnabled: client.checkBluetoothEnabled,
-        enableBluetoothServices: client.enableBluetoothServices,
-      );
+    checkP2pPermissions: client.checkP2pPermissions,
+    askP2pPermissions: client.askP2pPermissions,
+    checkBluetoothPermissions: client.checkBluetoothPermissions,
+    askBluetoothPermissions: client.askBluetoothPermissions,
+    checkStoragePermission: client.checkStoragePermission,
+    askStoragePermission: client.askStoragePermission,
+    checkWifiEnabled: client.checkWifiEnabled,
+    enableWifiServices: client.enableWifiServices,
+    checkLocationEnabled: client.checkLocationEnabled,
+    enableLocationServices: client.enableLocationServices,
+    checkBluetoothEnabled: client.checkBluetoothEnabled,
+    enableBluetoothServices: client.enableBluetoothServices,
+  );
 
   final _Check checkP2pPermissions;
   final _Check askP2pPermissions;
@@ -107,13 +109,13 @@ class _P2pGate {
   /// The six read-only checks, in checklist order. Used by "Diagnose", which
   /// must never prompt.
   Map<String, _Check> get readOnlyChecks => <String, _Check>{
-        'checkP2pPermissions': checkP2pPermissions,
-        'checkBluetoothPermissions': checkBluetoothPermissions,
-        'checkStoragePermission': checkStoragePermission,
-        'checkWifiEnabled': checkWifiEnabled,
-        'checkLocationEnabled': checkLocationEnabled,
-        'checkBluetoothEnabled': checkBluetoothEnabled,
-      };
+    'checkP2pPermissions': checkP2pPermissions,
+    'checkBluetoothPermissions': checkBluetoothPermissions,
+    'checkStoragePermission': checkStoragePermission,
+    'checkWifiEnabled': checkWifiEnabled,
+    'checkLocationEnabled': checkLocationEnabled,
+    'checkBluetoothEnabled': checkBluetoothEnabled,
+  };
 }
 
 /// Offline mesh tab.
@@ -153,6 +155,7 @@ class _MeshScreenState extends State<MeshScreen> {
   // --- connection state (unchanged behaviour) ---
   _MeshRole _role = _MeshRole.none;
   FlutterP2pHost? _host;
+
   /// Owns the client-side connection lifecycle: state guards, cooldown,
   /// backoff, watchdogs and hard recovery. The Mesh screen's manual controls
   /// and the cycle-test harness drive this same instance, so there is only one
@@ -200,7 +203,9 @@ class _MeshScreenState extends State<MeshScreen> {
   final ScrollController _logScroll = ScrollController();
 
   // --- mesh state ---
-  final MessageStore _store = MessageStore();
+  // Shared with Home/Create Request: reports queued there join the next mesh
+  // anti-entropy exchange without needing a separate import path.
+  final MessageStore _store = reportStore;
   final SyncProtocol _sync = const SyncProtocol();
 
   /// Relay node built on the same ConnectionManager. Created with the
@@ -219,10 +224,10 @@ class _MeshScreenState extends State<MeshScreen> {
 
   /// True once the group is actually usable for sending frames.
   bool get _isLive => switch (_role) {
-        _MeshRole.host => _host?.isGroupCreated ?? false,
-        _MeshRole.client => _connection?.isConnected ?? false,
-        _MeshRole.none => false,
-      };
+    _MeshRole.host => _host?.isGroupCreated ?? false,
+    _MeshRole.client => _connection?.isConnected ?? false,
+    _MeshRole.none => false,
+  };
 
   @override
   void dispose() {
@@ -259,7 +264,8 @@ class _MeshScreenState extends State<MeshScreen> {
       connection.dispose();
     }
 
-    _store.dispose();
+    // `reportStore` is app-wide; Home and Create Request may queue a report
+    // while this tab is not mounted, so it must outlive an individual screen.
     _logScroll.dispose();
     super.dispose();
   }
@@ -320,8 +326,10 @@ class _MeshScreenState extends State<MeshScreen> {
       _gateLog('$checkName threw: ${e.runtimeType}: $e', _LogKind.error);
       return false;
     }
-    _gateLog('$checkName = $before',
-        before ? _LogKind.protocol : _LogKind.warn);
+    _gateLog(
+      '$checkName = $before',
+      before ? _LogKind.protocol : _LogKind.warn,
+    );
     if (before) return true;
 
     _gateLog('calling $actionName...');
@@ -344,8 +352,10 @@ class _MeshScreenState extends State<MeshScreen> {
       _gateLog('$checkName threw: ${e.runtimeType}: $e', _LogKind.error);
       return false;
     }
-    _gateLog('$checkName = $after (after)',
-        after ? _LogKind.protocol : _LogKind.warn);
+    _gateLog(
+      '$checkName = $after (after)',
+      after ? _LogKind.protocol : _LogKind.warn,
+    );
     return after;
   }
 
@@ -370,9 +380,11 @@ class _MeshScreenState extends State<MeshScreen> {
       actionName: 'askP2pPermissions',
       action: gate.askP2pPermissions,
     )) {
-      return _blockedBy('checkP2pPermissions',
-          'Wi-Fi Direct permission was refused. Grant it in Settings › Apps › '
-              'Samanvay Responder › Permissions, then try again.');
+      return _blockedBy(
+        'checkP2pPermissions',
+        'Wi-Fi Direct permission was refused. Grant it in Settings › Apps › '
+            'Samanvay Responder › Permissions, then try again.',
+      );
     }
 
     if (!await _runGate(
@@ -382,9 +394,10 @@ class _MeshScreenState extends State<MeshScreen> {
       action: gate.askBluetoothPermissions,
     )) {
       return _blockedBy(
-          'checkBluetoothPermissions',
-          'Bluetooth permission was refused. Discovery needs BLE, so the mesh '
-              'cannot start without it.');
+        'checkBluetoothPermissions',
+        'Bluetooth permission was refused. Discovery needs BLE, so the mesh '
+            'cannot start without it.',
+      );
     }
 
     // Storage is only needed for file transfer, and on Android 13+ the legacy
@@ -396,8 +409,10 @@ class _MeshScreenState extends State<MeshScreen> {
       actionName: 'askStoragePermission',
       action: gate.askStoragePermission,
     )) {
-      _gateLog('storage unavailable — file transfer disabled (not fatal)',
-          _LogKind.warn);
+      _gateLog(
+        'storage unavailable — file transfer disabled (not fatal)',
+        _LogKind.warn,
+      );
     }
 
     _setStatus('Checking radios…');
@@ -409,8 +424,10 @@ class _MeshScreenState extends State<MeshScreen> {
       action: gate.enableWifiServices,
       settle: _settleAfterPrompt,
     )) {
-      return _blockedBy('checkWifiEnabled',
-          'Wi-Fi is still off. Turn it on, then try again.');
+      return _blockedBy(
+        'checkWifiEnabled',
+        'Wi-Fi is still off. Turn it on, then try again.',
+      );
     }
 
     if (!await _runGate(
@@ -421,9 +438,10 @@ class _MeshScreenState extends State<MeshScreen> {
       settle: _settleAfterPrompt,
     )) {
       return _blockedBy(
-          'checkLocationEnabled',
-          'Location services are still off. Android will not scan for peers '
-              'without them.');
+        'checkLocationEnabled',
+        'Location services are still off. Android will not scan for peers '
+            'without them.',
+      );
     }
 
     if (!await _runGate(
@@ -433,8 +451,10 @@ class _MeshScreenState extends State<MeshScreen> {
       action: gate.enableBluetoothServices,
       settle: _settleAfterPrompt,
     )) {
-      return _blockedBy('checkBluetoothEnabled',
-          'Bluetooth is still off. Turn it on, then try again.');
+      return _blockedBy(
+        'checkBluetoothEnabled',
+        'Bluetooth is still off. Turn it on, then try again.',
+      );
     }
 
     _gateLog('--- checklist passed ---');
@@ -480,8 +500,10 @@ class _MeshScreenState extends State<MeshScreen> {
         try {
           final bool value = await entry.value();
           if (!value) failing++;
-          _gateLog('${entry.key} = $value',
-              value ? _LogKind.protocol : _LogKind.warn);
+          _gateLog(
+            '${entry.key} = $value',
+            value ? _LogKind.protocol : _LogKind.warn,
+          );
         } catch (e) {
           failing++;
           _gateLog('${entry.key} threw: ${e.runtimeType}: $e', _LogKind.error);
@@ -532,32 +554,40 @@ class _MeshScreenState extends State<MeshScreen> {
         // type is as diagnostic as the message, so log both.
         _addLog('! createGroup failed: ${e.runtimeType}: $e', _LogKind.error);
         if (mounted) {
-          setState(() => _blockedReason =
-              'Could not create the Wi-Fi Direct group. See the sync log for '
-                  'the exact error.');
+          setState(
+            () => _blockedReason =
+                'Could not create the Wi-Fi Direct group. See the sync log for '
+                'the exact error.',
+          );
         }
         await _teardown();
         return;
       }
       if (!mounted) return;
       setState(() => _hostState = state);
-      _addLog('Group up — SSID ${state.ssid ?? "?"} '
-          '(${state.hostIpAddress ?? "no ip"}). Advertising over BLE.');
+      _addLog(
+        'Group up — SSID ${state.ssid ?? "?"} '
+        '(${state.hostIpAddress ?? "no ip"}). Advertising over BLE.',
+      );
 
       _subs
-        ..add(host.streamHotspotState().listen(
-          (HotspotHostState s) {
-            if (!mounted) return;
-            setState(() => _hostState = s);
-            if (!s.isActive) _addLog('Group went down.', _LogKind.error);
-          },
-          onError: (Object e) => _addLog('Hotspot error: $e', _LogKind.error),
-        ))
-        ..add(host.streamClientList().listen(
-          _onClientListChanged,
-          onError: (Object e) =>
-              _addLog('Client list error: $e', _LogKind.error),
-        ));
+        ..add(
+          host.streamHotspotState().listen(
+            (HotspotHostState s) {
+              if (!mounted) return;
+              setState(() => _hostState = s);
+              if (!s.isActive) _addLog('Group went down.', _LogKind.error);
+            },
+            onError: (Object e) => _addLog('Hotspot error: $e', _LogKind.error),
+          ),
+        )
+        ..add(
+          host.streamClientList().listen(
+            _onClientListChanged,
+            onError: (Object e) =>
+                _addLog('Client list error: $e', _LogKind.error),
+          ),
+        );
       _bindReceivedTexts();
 
       _setStatus(null);
@@ -661,8 +691,8 @@ class _MeshScreenState extends State<MeshScreen> {
 
     // The manager applies cooldown and backoff first and bounds the scan with
     // its watchdog. onDevices drives the live list; the return value is final.
-    final OperationOutcome<List<BleDiscoveredDevice>> outcome =
-        await connection.scan(
+    final OperationOutcome<List<BleDiscoveredDevice>>
+    outcome = await connection.scan(
       onDevices: (List<BleDiscoveredDevice> found) {
         if (!mounted) return;
         setState(() {
@@ -698,8 +728,9 @@ class _MeshScreenState extends State<MeshScreen> {
       _blockedReason = null;
       _scanning = false;
     });
-    final String name =
-        device.deviceName.isEmpty ? device.deviceAddress : device.deviceName;
+    final String name = device.deviceName.isEmpty
+        ? device.deviceAddress
+        : device.deviceName;
     _setStatus('Connecting to $name…');
 
     try {
@@ -716,9 +747,9 @@ class _MeshScreenState extends State<MeshScreen> {
         setState(() {
           _blockedReason = outcome.errorType == WatchdogTimeout.type
               ? 'Connecting to $name hung and was aborted by the watchdog. '
-                  'The manager is cooling the radio down before the next try.'
+                    'The manager is cooling the radio down before the next try.'
               : 'Could not connect to $name. See the sync log for the exact '
-                  'error, or run Diagnose to check the radios.';
+                    'error, or run Diagnose to check the radios.';
         });
         return;
       }
@@ -745,20 +776,14 @@ class _MeshScreenState extends State<MeshScreen> {
     unawaited(_hotspotSub?.cancel());
     unawaited(_peerSub?.cancel());
 
-    _hotspotSub = client.streamHotspotState().listen(
-      (HotspotClientState s) {
-        if (!mounted) return;
-        setState(() => _clientState = s);
-      },
-      onError: (Object e) => _addLog('Hotspot error: $e', _LogKind.error),
-    );
-    _peerSub = client.streamClientList().listen(
-      (List<P2pClientInfo> clients) {
-        if (!mounted) return;
-        setState(() => _peers = clients);
-      },
-      onError: (Object e) => _addLog('Client list error: $e', _LogKind.error),
-    );
+    _hotspotSub = client.streamHotspotState().listen((HotspotClientState s) {
+      if (!mounted) return;
+      setState(() => _clientState = s);
+    }, onError: (Object e) => _addLog('Hotspot error: $e', _LogKind.error));
+    _peerSub = client.streamClientList().listen((List<P2pClientInfo> clients) {
+      if (!mounted) return;
+      setState(() => _peers = clients);
+    }, onError: (Object e) => _addLog('Client list error: $e', _LogKind.error));
     _bindReceivedTexts();
   }
 
@@ -810,25 +835,27 @@ class _MeshScreenState extends State<MeshScreen> {
 
   /// Queues one inbound frame for in-order handling.
   void _enqueueFrame(String raw) {
-    _frameQueue = _frameQueue.then((_) async {
-      // While bridging, the bridge routes frames so it can see which message
-      // ids leave and to which host — that is how a completed relay is
-      // detected. It calls the same SyncProtocol underneath; only the sink is
-      // wrapped, so store and protocol behaviour are identical either way.
-      final BridgeMode? bridge = _bridge;
-      if (bridge != null && bridge.isRunning) {
-        await bridge.handleFrame(raw);
-        return;
-      }
-      await _sync.handleFrame(
-        raw,
-        _store,
-        _sendFrame,
-        (String line) => _addLog(line, _LogKind.protocol),
-      );
-    }).catchError((Object e) {
-      _addLog('! frame handling failed: $e', _LogKind.error);
-    });
+    _frameQueue = _frameQueue
+        .then((_) async {
+          // While bridging, the bridge routes frames so it can see which message
+          // ids leave and to which host — that is how a completed relay is
+          // detected. It calls the same SyncProtocol underneath; only the sink is
+          // wrapped, so store and protocol behaviour are identical either way.
+          final BridgeMode? bridge = _bridge;
+          if (bridge != null && bridge.isRunning) {
+            await bridge.handleFrame(raw);
+            return;
+          }
+          await _sync.handleFrame(
+            raw,
+            _store,
+            _sendFrame,
+            (String line) => _addLog(line, _LogKind.protocol),
+          );
+        })
+        .catchError((Object e) {
+          _addLog('! frame handling failed: $e', _LogKind.error);
+        });
   }
 
   /// Sends our DIGEST, which invites every peer to push what we are missing.
@@ -873,13 +900,17 @@ class _MeshScreenState extends State<MeshScreen> {
       return;
     }
 
-    _autoGenerateTimer =
-        Timer.periodic(Duration(seconds: _autoGenerateSeconds), (_) {
-      if (!mounted) return;
-      unawaited(_createTestMessage(auto: true));
-    });
-    _addLog('auto-generate on — one ${_draftType.wireName} '
-        'every ${_autoGenerateSeconds}s');
+    _autoGenerateTimer = Timer.periodic(
+      Duration(seconds: _autoGenerateSeconds),
+      (_) {
+        if (!mounted) return;
+        unawaited(_createTestMessage(auto: true));
+      },
+    );
+    _addLog(
+      'auto-generate on — one ${_draftType.wireName} '
+      'every ${_autoGenerateSeconds}s',
+    );
   }
 
   /// Creates a message locally and pushes it straight out as a MSG frame.
@@ -902,8 +933,10 @@ class _MeshScreenState extends State<MeshScreen> {
     );
 
     _store.add(message);
-    _addLog('${auto ? 'auto-created' : 'created'} ${message.type} '
-        'p${message.priority} #${DeviceIdentity.shorten(message.id)}');
+    _addLog(
+      '${auto ? 'auto-created' : 'created'} ${message.type} '
+      'p${message.priority} #${DeviceIdentity.shorten(message.id)}',
+    );
 
     if (!_isLive) {
       _addLog('offline — held in store, will sync on next contact');
@@ -912,8 +945,10 @@ class _MeshScreenState extends State<MeshScreen> {
 
     try {
       await _sendFrame(_sync.buildMessageFrame(message));
-      _addLog('> MSG #${DeviceIdentity.shorten(message.id)}',
-          _LogKind.protocol);
+      _addLog(
+        '> MSG #${DeviceIdentity.shorten(message.id)}',
+        _LogKind.protocol,
+      );
     } catch (e) {
       _addLog('! MSG send failed: $e', _LogKind.error);
     }
@@ -935,8 +970,10 @@ class _MeshScreenState extends State<MeshScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Tap "Join as client" first — bridge mode carries '
-                'from the client side.'),
+            content: Text(
+              'Tap "Join as client" first — bridge mode carries '
+              'from the client side.',
+            ),
           ),
         );
       return;
@@ -956,8 +993,10 @@ class _MeshScreenState extends State<MeshScreen> {
     // run would have swapped the client instance out from under our streams.
     if (!mounted) return;
     _bindClientStreams();
-    _addLog('returned from bridge mode — '
-        '${bridge.relaysCompleted} relay(s) completed, ${bridge.perHopLabel}');
+    _addLog(
+      'returned from bridge mode — '
+      '${bridge.relaysCompleted} relay(s) completed, ${bridge.perHopLabel}',
+    );
   }
 
   // --- cycle test ----------------------------------------------------------
@@ -976,8 +1015,10 @@ class _MeshScreenState extends State<MeshScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Tap "Join as client" first — the cycle test '
-                'drives the client side.'),
+            content: Text(
+              'Tap "Join as client" first — the cycle test '
+              'drives the client side.',
+            ),
           ),
         );
       return;
@@ -1001,7 +1042,9 @@ class _MeshScreenState extends State<MeshScreen> {
     // from the one this screen last bound to.
     if (!mounted) return;
     _bindClientStreams();
-    _addLog('returned from cycle test — store holds ${_store.count} message(s)');
+    _addLog(
+      'returned from cycle test — store holds ${_store.count} message(s)',
+    );
   }
 
   // --- teardown ------------------------------------------------------------
@@ -1110,7 +1153,8 @@ class _MeshScreenState extends State<MeshScreen> {
   }
 
   Widget _buildBody() {
-    final bool showDevices = _role == _MeshRole.client &&
+    final bool showDevices =
+        _role == _MeshRole.client &&
         !_isLive &&
         (_scanning || _devices.isNotEmpty);
 
@@ -1152,8 +1196,7 @@ class _MeshScreenState extends State<MeshScreen> {
       MeshConnectionState.cooldown => AppColors.p2,
       MeshConnectionState.scanning ||
       MeshConnectionState.connecting ||
-      MeshConnectionState.disconnecting =>
-        AppColors.info,
+      MeshConnectionState.disconnecting => AppColors.info,
       MeshConnectionState.idle => AppColors.textSecondary,
     };
 
@@ -1247,8 +1290,11 @@ class _MeshScreenState extends State<MeshScreen> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              const Icon(Icons.wifi_tethering_off,
-                  size: 20, color: AppColors.textSecondary),
+              const Icon(
+                Icons.wifi_tethering_off,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 10),
               Text('Not on a mesh', style: text.titleMedium),
             ],
@@ -1314,8 +1360,11 @@ class _MeshScreenState extends State<MeshScreen> {
               const SizedBox(width: 8),
               StatusBadge(label: stateLabel, color: stateColor, dense: true),
               const Spacer(),
-              const Icon(Icons.group_outlined,
-                  size: 20, color: AppColors.textSecondary),
+              const Icon(
+                Icons.group_outlined,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 6),
               Text('${_peers.length}', style: text.titleMedium),
             ],
@@ -1365,7 +1414,7 @@ class _MeshScreenState extends State<MeshScreen> {
                       _scanning
                           ? 'Looking for advertising hosts…'
                           : 'No hosts found. Ask someone nearby to start '
-                              'hosting, then rescan.',
+                                'hosting, then rescan.',
                       style: text.bodySmall,
                     ),
                   )
@@ -1392,8 +1441,10 @@ class _MeshScreenState extends State<MeshScreen> {
                                 : d.deviceName,
                             style: text.titleMedium,
                           ),
-                          subtitle:
-                              Text(d.deviceAddress, style: text.bodySmall),
+                          subtitle: Text(
+                            d.deviceAddress,
+                            style: text.bodySmall,
+                          ),
                           trailing: const Icon(Icons.chevron_right),
                           enabled: !_busy,
                           onTap: () => _connectTo(d),
@@ -1487,8 +1538,10 @@ class _MeshScreenState extends State<MeshScreen> {
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text('No protocol activity yet.',
-                        style: text.bodySmall),
+                    child: Text(
+                      'No protocol activity yet.',
+                      style: text.bodySmall,
+                    ),
                   ),
                 )
               : ListView.builder(
@@ -1537,10 +1590,12 @@ class _MeshScreenState extends State<MeshScreen> {
             _setAutoGenerate(seconds: value);
           },
           items: intervals
-              .map((int s) => DropdownMenuItem<int>(
-                    value: s,
-                    child: Text('${s}s', style: text.bodyMedium),
-                  ))
+              .map(
+                (int s) => DropdownMenuItem<int>(
+                  value: s,
+                  child: Text('${s}s', style: text.bodyMedium),
+                ),
+              )
               .toList(),
         ),
         const SizedBox(width: 4),
@@ -1573,8 +1628,10 @@ class _MeshScreenState extends State<MeshScreen> {
               _buildAutoGenerateRow(text),
               const Divider(height: 20),
             ],
-            Text('CREATE TEST MESSAGE',
-                style: text.bodySmall?.copyWith(letterSpacing: 1.2)),
+            Text(
+              'CREATE TEST MESSAGE',
+              style: text.bodySmall?.copyWith(letterSpacing: 1.2),
+            ),
             const SizedBox(height: 8),
             Row(
               children: <Widget>[
@@ -1597,25 +1654,28 @@ class _MeshScreenState extends State<MeshScreen> {
                         setState(() => _draftType = value);
                       },
                       items: MeshMessageType.values
-                          .map((MeshMessageType t) =>
-                              DropdownMenuItem<MeshMessageType>(
-                                value: t,
-                                child: Row(
-                                  children: <Widget>[
-                                    StatusBadge.severity(
+                          .map(
+                            (MeshMessageType t) =>
+                                DropdownMenuItem<MeshMessageType>(
+                                  value: t,
+                                  child: Row(
+                                    children: <Widget>[
+                                      StatusBadge.severity(
                                         'P${t.defaultPriority}',
-                                        dense: true),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        t.label,
-                                        style: text.bodyLarge,
-                                        overflow: TextOverflow.ellipsis,
+                                        dense: true,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          t.label,
+                                          style: text.bodyLarge,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ))
+                          )
                           .toList(),
                     ),
                   ),
@@ -1628,8 +1688,7 @@ class _MeshScreenState extends State<MeshScreen> {
                     onPressed: _createTestMessage,
                     style: ElevatedButton.styleFrom(
                       padding: EdgeInsets.zero,
-                      minimumSize:
-                          const Size.square(AppTheme.minTouchTarget),
+                      minimumSize: const Size.square(AppTheme.minTouchTarget),
                     ),
                     child: const Icon(Icons.add, size: 26),
                   ),
@@ -1703,9 +1762,7 @@ class _SectionHeader extends StatelessWidget {
             child: Text(
               title,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
+              style: Theme.of(context).textTheme.bodySmall
                   ?.copyWith(letterSpacing: 1.2, color: AppColors.textPrimary),
             ),
           ),
@@ -1729,6 +1786,9 @@ class _StoreRow extends StatelessWidget {
     String two(int n) => n.toString().padLeft(2, '0');
     final String time =
         '${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
+    final String? incidentType = message.payload['incidentType'] as String?;
+    final String? severity = message.payload['severity'] as String?;
+    final Widget? preview = _thumbnail(message.payload['thumbnailBase64']);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -1739,12 +1799,15 @@ class _StoreRow extends StatelessWidget {
           // severity colour and falls through to grey, which is what we want.
           StatusBadge.severity('P${message.priority}', dense: true),
           const SizedBox(width: 12),
+          if (preview != null) ...<Widget>[preview, const SizedBox(width: 10)],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  message.type,
+                  incidentType == null
+                      ? message.type
+                      : '${incidentType.replaceAll('_', ' ')}${severity == null ? '' : ' · $severity'}',
                   style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1769,6 +1832,26 @@ class _StoreRow extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Invalid previews from an older or corrupt peer must never break the
+  /// message list; the report metadata is still valuable without the image.
+  Widget? _thumbnail(Object? encoded) {
+    if (encoded is! String || encoded.isEmpty) return null;
+    try {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Image.memory(
+          base64Decode(encoded),
+          width: 42,
+          height: 42,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      );
+    } on FormatException {
+      return null;
+    }
   }
 }
 
@@ -1810,8 +1893,10 @@ class _LogRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(entry.stamp,
-              style: _mono.copyWith(color: AppColors.textSecondary)),
+          Text(
+            entry.stamp,
+            style: _mono.copyWith(color: AppColors.textSecondary),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(entry.text, style: _mono.copyWith(color: _color)),

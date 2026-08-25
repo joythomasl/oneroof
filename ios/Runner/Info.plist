@@ -8,6 +8,10 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Oneroof</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ONE ROOF uses the camera to capture verified incident evidence.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ONE ROOF attaches your current location to incident reports.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
