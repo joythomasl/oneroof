@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_p2p_connection/flutter_p2p_connection.dart';
 
+import '../../mesh/connection_manager.dart';
 import '../../mesh/cycle_tester.dart';
 import '../../mesh/device_identity.dart';
 import '../../mesh/message_store.dart';
@@ -26,25 +27,22 @@ class _Col {
 
 /// Runs [CycleTester] and shows the results live.
 ///
-/// Needs a [FlutterP2pClient] that has already been initialised — the Mesh
-/// screen creates one when you tap "Join as client", and hands it here.
+/// Drives the Mesh screen's [ConnectionManager] — the same instance manual use
+/// goes through, so both paths exercise identical guards, cooldown, backoff
+/// and recovery. Stream re-binding after each reconnect is the manager's job
+/// (`ConnectionManager.onConnected`), not this screen's.
 class CycleTestScreen extends StatefulWidget {
   const CycleTestScreen({
     super.key,
-    required this.client,
+    required this.connection,
     required this.store,
     required this.protocol,
-    required this.onConnected,
     this.knownTargets = const <BleDiscoveredDevice>[],
   });
 
-  final FlutterP2pClient client;
+  final ConnectionManager connection;
   final MessageStore store;
   final SyncProtocol protocol;
-
-  /// Re-binds the Mesh screen's transport-scoped streams after each reconnect.
-  /// See [CycleTester]'s class doc for why this is mandatory.
-  final Future<void> Function() onConnected;
 
   /// Hosts already discovered by the Mesh screen. Passed through to
   /// [CycleTester.targets] for round-robin runs; empty means "first found".
@@ -97,17 +95,22 @@ class _CycleTestScreenState extends State<CycleTestScreen> {
     final int? count =
         _infinite ? null : (int.tryParse(_cycles.text.trim()) ?? 10);
 
+    // Scan and connect timings belong to the connection policy, so they are
+    // pushed into the manager rather than held here. Refused if the manager is
+    // mid-operation, which is why this happens before the run starts.
+    widget.connection.tuning = widget.connection.tuning.copyWith(
+      scanTimeout: _seconds(_scanSeconds, 8),
+      connectTimeout: _seconds(_connectSeconds, 20),
+    );
+
     final CycleTester tester = CycleTester(
-      client: widget.client,
+      connection: widget.connection,
       store: widget.store,
       protocol: widget.protocol,
       targets: widget.knownTargets,
       cycleCount: count,
-      scanTimeout: _seconds(_scanSeconds, 8),
-      connectTimeout: _seconds(_connectSeconds, 20),
       syncSettle: _seconds(_syncSeconds, 6),
       settleDelay: _seconds(_settleSeconds, 5),
-      onConnected: widget.onConnected,
       onLog: (String line) {
         if (!mounted) return;
         setState(() => _log.add(line));
@@ -147,6 +150,7 @@ class _CycleTestScreenState extends State<CycleTestScreen> {
 
   String _buildReport() {
     final CycleSummary s = CycleSummary.from(_results);
+    final ConnectionHealth health = widget.connection.health;
     final StringBuffer b = StringBuffer()
       ..writeln('Samanvay Responder — mesh cycle test')
       ..writeln('device      : ${DeviceIdentity.shortDeviceId}')
@@ -165,6 +169,13 @@ class _CycleTestScreenState extends State<CycleTestScreen> {
       ..writeln('  cycle mean         : ${_fmt(s.meanTotal)}')
       ..writeln('  consecutive fails  : ${s.consecutiveFailures} (max ${s.maxConsecutiveFailures})')
       ..writeln('  messages gained    : ${s.totalGained}')
+      ..writeln()
+      ..writeln('CONNECTION HEALTH')
+      ..writeln('  state              : ${health.state.label}')
+      ..writeln('  connect attempts   : ${health.totalSuccesses}/${health.totalAttempts} '
+          '(${health.successRate.toStringAsFixed(1)}%)')
+      ..writeln('  hard recoveries    : ${health.recoveryCount}')
+      ..writeln('  last failure       : ${health.lastFailureType ?? "none"}')
       ..writeln()
       ..writeln('CYCLES')
       ..writeln(CycleResult.logHeader);
@@ -313,6 +324,11 @@ class _CycleTestScreenState extends State<CycleTestScreen> {
           _StatLine(
             label: 'Messages gained',
             value: '${s.totalGained}  ·  store ${widget.store.count}',
+          ),
+          _StatLine(
+            label: 'Hard recoveries',
+            value: '${widget.connection.recoveryCount}',
+            color: widget.connection.recoveryCount > 0 ? AppColors.p1 : null,
           ),
           if (degrading) ...<Widget>[
             const SizedBox(height: 8),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_p2p_connection/flutter_p2p_connection.dart';
 
+import 'connection_manager.dart';
 import 'message_store.dart';
 import 'sync_protocol.dart';
 
@@ -186,35 +187,31 @@ class CycleSummary {
 ///
 /// ## Ownership
 ///
-/// The tester borrows the [client]; it never calls `initialize()` or
-/// `dispose()` on it. The screen that created the client keeps that job. The
-/// tester only scans, connects, disconnects.
+/// The tester drives a [ConnectionManager]; it never touches the plugin
+/// directly. Everything about *how* to connect safely — state guards,
+/// cooldown, backoff, watchdogs, the circuit breaker — lives in the manager,
+/// so the harness and the Mesh screen's manual controls exercise exactly the
+/// same hardened path. A bug that only showed up in one of them would be a bug
+/// found on stage.
 ///
-/// ## Why [onConnected] exists
-///
-/// `FlutterP2pClient.streamReceivedTexts()` binds to the transport's stream
-/// once and completes for good when `disconnect()` disposes that transport.
-/// Any subscription feeding [store] is therefore dead after the first cycle
-/// unless something re-subscribes. [onConnected] runs after every successful
-/// connect, before the digest goes out, for exactly that. Without it every
-/// cycle after the first reports `messagesGained: 0` and the harness blames
-/// the radio for a dead listener.
+/// The manager also owns re-binding transport-scoped streams after each
+/// connect (`ConnectionManager.onConnected`), which is mandatory:
+/// `streamReceivedTexts()` completes for good when `disconnect()` disposes the
+/// transport, so without a re-bind every cycle after the first would report
+/// `messagesGained: 0` and blame the radio for a dead listener.
 class CycleTester {
   CycleTester({
-    required this.client,
+    required this.connection,
     required this.store,
     required this.protocol,
     this.targets = const <BleDiscoveredDevice>[],
     this.cycleCount,
-    this.scanTimeout = const Duration(seconds: 8),
-    this.connectTimeout = const Duration(seconds: 20),
     this.syncSettle = const Duration(seconds: 6),
     this.settleDelay = const Duration(seconds: 5),
-    this.onConnected,
     this.onLog,
   });
 
-  final FlutterP2pClient client;
+  final ConnectionManager connection;
   final MessageStore store;
   final SyncProtocol protocol;
 
@@ -225,13 +222,10 @@ class CycleTester {
   /// Null runs until [stop].
   final int? cycleCount;
 
-  final Duration scanTimeout;
-  final Duration connectTimeout;
+  /// Harness pacing. Scan and connect timings belong to the manager's
+  /// [ConnectionTuning], not here.
   final Duration syncSettle;
   final Duration settleDelay;
-
-  /// Re-bind transport-scoped streams. See the class doc.
-  final Future<void> Function()? onConnected;
 
   final void Function(String line)? onLog;
 
@@ -260,15 +254,18 @@ class CycleTester {
     final Completer<void> finished = Completer<void>();
     _finished = finished;
 
+    final ConnectionTuning tuning = connection.tuning;
     _log('cycle test starting — '
         '${cycleCount == null ? 'infinite' : '$cycleCount cycle(s)'}, '
-        'scan ${scanTimeout.inSeconds}s / connect ${connectTimeout.inSeconds}s '
-        '/ sync ${syncSettle.inSeconds}s / settle ${settleDelay.inSeconds}s');
+        'scan ${tuning.scanTimeout.inSeconds}s / '
+        'connect ${tuning.connectTimeout.inSeconds}s / '
+        'sync ${syncSettle.inSeconds}s / settle ${settleDelay.inSeconds}s, '
+        'cooldown ${tuning.cooldown.inSeconds}s / '
+        'breaker at ${tuning.failureThreshold}');
 
     try {
       // Begin from a known state so cycle 1 is identical to cycle N.
-      await _safeStopScan();
-      await _safeDisconnect();
+      await connection.disconnect();
 
       int n = 0;
       while (!_stopRequested && (cycleCount == null || n < cycleCount!)) {
@@ -283,8 +280,7 @@ class CycleTester {
       }
     } finally {
       // Whatever happened, leave the radio idle and disconnected.
-      await _safeStopScan();
-      await _safeDisconnect();
+      await connection.disconnect();
       _running = false;
       _finished = null;
       if (!finished.isCompleted) finished.complete();
@@ -299,8 +295,7 @@ class CycleTester {
   /// the scan and disconnected.
   Future<void> stop() async {
     if (!_running) {
-      await _safeStopScan();
-      await _safeDisconnect();
+      await connection.disconnect();
       return;
     }
     _log('stop requested');
@@ -331,40 +326,64 @@ class CycleTester {
     String? errorMessage;
 
     try {
-      // 1. Scan.
-      final Stopwatch scanWatch = Stopwatch()..start();
-      final List<BleDiscoveredDevice> found = await _scan(cycleNumber - 1);
-      scanWatch.stop();
-      scanDuration = scanWatch.elapsed;
-      scanSucceeded = found.isNotEmpty;
+      // 1. Scan. The manager applies cooldown, backoff and the circuit breaker
+      // before it starts, and its watchdog bounds how long it can take.
+      final int index = cycleNumber - 1;
+      final OperationOutcome<List<BleDiscoveredDevice>> scan =
+          await connection.scan(
+        isEnough: (List<BleDiscoveredDevice> d) => selectTarget(d, index) != null,
+      );
+      scanDuration = scan.duration;
 
+      if (scan.rejected) {
+        throw CycleStepException(
+            'Rejected', scan.errorMessage ?? 'scan refused by state guard');
+      }
+      if (scan.errorType != null) {
+        throw CycleStepException(
+            scan.errorType!, scan.errorMessage ?? 'scan failed');
+      }
+
+      final List<BleDiscoveredDevice> found =
+          scan.value ?? const <BleDiscoveredDevice>[];
+      scanSucceeded = found.isNotEmpty;
       if (!scanSucceeded) {
+        // The manager cannot know an empty scan is a problem — it has no idea
+        // a host was supposed to be there. Tell it, so a radio that has gone
+        // deaf still counts toward backoff and the breaker.
+        connection.noteFailure('NoHostsFound');
         throw const CycleStepException('NoHostsFound', 'scan found no hosts');
       }
       _throwIfStopped('scan');
 
-      final BleDiscoveredDevice? target = selectTarget(found, cycleNumber - 1);
+      final BleDiscoveredDevice? target = selectTarget(found, index);
       if (target == null) {
+        connection.noteFailure('TargetNotFound');
         throw const CycleStepException(
             'TargetNotFound', 'wanted host was not in range this cycle');
       }
       targetName =
           target.deviceName.isEmpty ? target.deviceAddress : target.deviceName;
 
-      // 2. Connect.
-      final Stopwatch connectWatch = Stopwatch()..start();
-      await client.connectWithDevice(target, timeout: connectTimeout);
-      connectWatch.stop();
-      connectDuration = connectWatch.elapsed;
+      // 2. Connect. onConnected (stream re-binding) fires inside this call,
+      // before it returns, so the digest below cannot outrun it.
+      final OperationOutcome<void> connectOutcome =
+          await connection.connect(target);
+      connectDuration = connectOutcome.duration;
+
+      if (connectOutcome.rejected) {
+        throw CycleStepException('Rejected',
+            connectOutcome.errorMessage ?? 'connect refused by state guard');
+      }
+      if (!connectOutcome.succeeded) {
+        throw CycleStepException(connectOutcome.errorType ?? 'ConnectFailed',
+            connectOutcome.errorMessage ?? 'connect failed');
+      }
       connectSucceeded = true;
       _throwIfStopped('connect');
 
-      // Re-bind whatever the previous disconnect tore down, before any frame
-      // can arrive. See the class doc.
-      await onConnected?.call();
-
       // 3. Digest, then let the exchange settle.
-      await client.broadcastText(protocol.buildDigest(store));
+      await connection.broadcastText(protocol.buildDigest(store));
       await _sleep(syncSettle);
       _throwIfStopped('sync');
     } catch (e) {
@@ -373,8 +392,9 @@ class CycleTester {
     }
 
     // 5. Disconnect — unconditionally, including after a failure. Leaving the
-    // radio attached is how a run degrades into meaningless data.
-    await _safeDisconnect();
+    // radio attached is how a run degrades into meaningless data. Idempotent,
+    // so a failure path that already tore down is a logged no-op.
+    await connection.disconnect();
     total.stop();
 
     return CycleResult(
@@ -397,48 +417,6 @@ class CycleTester {
     if (_stopRequested) {
       throw CycleStepException('StoppedByUser', 'stopped during $step');
     }
-  }
-
-  /// Scans, completing as soon as a usable target appears rather than always
-  /// burning the full [scanTimeout] — discovery latency is part of the hop
-  /// time being measured.
-  Future<List<BleDiscoveredDevice>> _scan(int cycleIndex) async {
-    final Completer<List<BleDiscoveredDevice>> completer =
-        Completer<List<BleDiscoveredDevice>>();
-    final List<BleDiscoveredDevice> seen = <BleDiscoveredDevice>[];
-
-    void finish() {
-      if (!completer.isCompleted) {
-        completer.complete(List<BleDiscoveredDevice>.of(seen));
-      }
-    }
-
-    try {
-      await client.startScan(
-        (List<BleDiscoveredDevice> devices) {
-          seen
-            ..clear()
-            ..addAll(devices);
-          if (selectTarget(seen, cycleIndex) != null) finish();
-        },
-        onError: (Object e) {
-          if (!completer.isCompleted) completer.completeError(e);
-        },
-        onDone: finish,
-        timeout: scanTimeout,
-      );
-    } catch (e) {
-      await _safeStopScan();
-      rethrow;
-    }
-
-    // Guard against onDone never arriving, so a cycle can never wedge here.
-    final List<BleDiscoveredDevice> found = await completer.future.timeout(
-      scanTimeout + const Duration(seconds: 2),
-      onTimeout: () => List<BleDiscoveredDevice>.of(seen),
-    );
-    await _safeStopScan();
-    return found;
   }
 
   /// Which host this cycle should visit.
@@ -465,22 +443,6 @@ class CycleTester {
   }
 
   // --- helpers -------------------------------------------------------------
-
-  Future<void> _safeDisconnect() async {
-    try {
-      await client.disconnect();
-    } catch (e) {
-      _log('disconnect failed (continuing): ${e.runtimeType}: $e');
-    }
-  }
-
-  Future<void> _safeStopScan() async {
-    try {
-      await client.stopScan();
-    } catch (e) {
-      _log('stopScan failed (continuing): ${e.runtimeType}: $e');
-    }
-  }
 
   /// A delay that [stop] can cut short, so pressing Stop during the 5s settle
   /// does not leave the operator waiting.

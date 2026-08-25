@@ -9,8 +9,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flutter_p2p_connection/flutter_p2p_connection.dart';
 import 'package:oneroof/main.dart';
+import 'package:oneroof/mesh/bridge_mode.dart';
+import 'package:oneroof/mesh/connection_manager.dart';
 import 'package:oneroof/mesh/message_store.dart';
 import 'package:oneroof/mesh/sync_protocol.dart';
+import 'package:oneroof/screens/mesh/bridge_screen.dart';
 import 'package:oneroof/screens/mesh/cycle_test_screen.dart';
 import 'package:oneroof/theme/app_theme.dart';
 
@@ -58,15 +61,17 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    // Constructing the client is inert — nothing touches a platform channel
-    // until the run starts, and this test never presses Start.
+    // Inert: the manager only touches a platform channel once an operation
+    // starts, and this test never presses Start.
     await tester.pumpWidget(MaterialApp(
       theme: AppTheme.dark,
       home: CycleTestScreen(
-        client: FlutterP2pClient(),
+        connection: ConnectionManager(
+          username: 'test',
+          clientFactory: FlutterP2pClient.new,
+        ),
         store: MessageStore(),
         protocol: const SyncProtocol(),
-        onConnected: () async {},
       ),
     ));
     await tester.pump();
@@ -74,6 +79,47 @@ void main() {
     expect(find.text('Start'), findsOneWidget);
     expect(find.text('Cycles'), findsOneWidget);
     expect(find.text('CONNECT'), findsOneWidget); // table header
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('bridge screen lays out on a POCO M6 5G without overflow',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.75;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final ConnectionManager connection = ConnectionManager(
+      username: 'test',
+      clientFactory: FlutterP2pClient.new,
+    );
+    addTearDown(connection.dispose);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark,
+      home: BridgeScreen(
+        bridge: BridgeMode(
+          connection: connection,
+          store: MessageStore(),
+          protocol: const SyncProtocol(),
+        ),
+        connection: connection,
+        discovered: const <BleDiscoveredDevice>[
+          BleDiscoveredDevice(deviceAddress: 'AA', deviceName: 'KRP-FIRE-04'),
+          BleDiscoveredDevice(deviceAddress: 'BB', deviceName: 'KRP-MED-02'),
+        ],
+      ),
+    ));
+    await tester.pump();
+
+    // Four number fields in one row is the tightest layout in the app.
+    expect(find.text('Scan s'), findsOneWidget);
+    expect(find.text('Settle s'), findsOneWidget);
+    expect(find.text('RELAYS COMPLETED'), findsOneWidget);
+    expect(find.text('— per hop'), findsOneWidget);
+    expect(find.text('Start bridging'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
