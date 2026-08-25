@@ -3,7 +3,7 @@ import { useUIStore } from '../stores/uiStore';
 import { DEMO_INCIDENTS, DEMO_AREAS, DEMO_UNITS } from '../demo/seed';
 import { fmtElapsedH, tone, isOpen } from './helpers';
 import { getScenarioMeta } from '../demo/scenarios';
-import { DISTRICT_CENTERS } from './map/mapLayout';
+import { geoPosition } from './map/mapLayout';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -49,7 +49,7 @@ export default function StatusStrip() {
         </div>
       </div>
 
-      <div className="vsep" />
+      <div className="vsep clock-sep" />
 
       <div className="elapsed">
         <div className="lbl">Longest active emergency · {longestEmergency?.name || 'None'}</div>
@@ -84,7 +84,7 @@ export default function StatusStrip() {
               <button key={d.id} onClick={() => {
                 setDistrictPopOpen(false);
                 selectArea(d.id);
-                const [cx, cy] = DISTRICT_CENTERS[d.id] || [500, 360];
+                const { x: cx, y: cy } = geoPosition(d.centroid[0], d.centroid[1]);
                 const zoom = 1.55;
                 setMapTransform(zoom, 500 - cx * zoom, 360 - cy * zoom);
               }}>
@@ -102,7 +102,7 @@ export default function StatusStrip() {
         </div>
       )}
 
-      <div className="vsep" />
+      <div className="vsep stats-sep" />
 
       <div className="stats">
         <div className="stat">

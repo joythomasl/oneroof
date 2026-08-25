@@ -31,15 +31,15 @@ export const DEMO_USER: UserProfile = {
 // ─── AREAS (Districts) ──────────────────────────────────────
 
 export const DEMO_AREAS: Area[] = [
-  { id: 'vellamunda',   name: 'Vellamunda',   profile: 'Coastal delta · pop. 3.4 L',         state: 'EMERGENCY', stateSince: ago(548),  stateAuthorizedBy: 'S. Rajeev Menon',  alertLevel: 'RED',    hazard: 'River flood + storm surge',         camps: 4, centroid: [75.29, 12.02], createdAt: NOW, updatedAt: NOW },
-  { id: 'chandragiri',  name: 'Chandragiri',  profile: 'Coastal plain · pop. 2.6 L',         state: 'ALERT',     stateSince: ago(861),  stateAuthorizedBy: 'A. Prasad Nair',   alertLevel: 'ORANGE', hazard: 'Cyclone track — CAT 2 cone',        camps: 2, centroid: [75.55, 12.05], createdAt: NOW, updatedAt: NOW },
-  { id: 'ottakkal',     name: 'Ottakkal',     profile: 'Upland plateau · pop. 1.9 L',        state: 'NORMAL',    stateSince: null,      stateAuthorizedBy: null,               alertLevel: 'GREEN',  hazard: '—',                                  camps: 0, centroid: [75.85, 12.09], createdAt: NOW, updatedAt: NOW },
-  { id: 'karippodu',    name: 'Karippodu',    profile: 'Urban port · pop. 4.1 L',            state: 'EMERGENCY', stateSince: ago(1122),  stateAuthorizedBy: 'Meera Nandakumar', alertLevel: 'RED',    hazard: 'Urban flood + structural collapse',  camps: 7, centroid: [75.37, 11.85], createdAt: NOW, updatedAt: NOW },
-  { id: 'nedumbara',    name: 'Nedumbara',    profile: 'Midland urban · pop. 3.0 L',         state: 'ALERT',     stateSince: ago(387),  stateAuthorizedBy: 'R. Devika',        alertLevel: 'ORANGE', hazard: 'Dam release — 3 shutters open',      camps: 1, centroid: [75.56, 11.86], createdAt: NOW, updatedAt: NOW },
-  { id: 'thodupara',    name: 'Thodupara',    profile: 'Hill · high slope risk · pop. 1.4 L', state: 'EMERGENCY', stateSince: ago(193),  stateAuthorizedBy: 'K. Ganesan',       alertLevel: 'RED',    hazard: 'Landslide cluster — GSI red',        camps: 3, centroid: [75.89, 11.72], createdAt: NOW, updatedAt: NOW },
-  { id: 'manalvayal',   name: 'Manalvayal',   profile: 'Coastal wetland · pop. 2.2 L',       state: 'NORMAL',    stateSince: null,      stateAuthorizedBy: null,               alertLevel: 'GREEN',  hazard: '—',                                  camps: 0, centroid: [75.36, 11.64], createdAt: NOW, updatedAt: NOW },
-  { id: 'kanjirode',    name: 'Kanjirode',    profile: 'Midland agri · pop. 2.8 L',          state: 'NORMAL',    stateSince: null,      stateAuthorizedBy: null,               alertLevel: 'GREEN',  hazard: '—',                                  camps: 0, centroid: [75.61, 11.66], createdAt: NOW, updatedAt: NOW },
-  { id: 'poovathur',    name: 'Poovathur',    profile: 'Hill forest · pop. 1.1 L',           state: 'NORMAL',    stateSince: null,      stateAuthorizedBy: null,               alertLevel: 'GREEN',  hazard: '—',                                  camps: 0, centroid: [75.87, 11.68], createdAt: NOW, updatedAt: NOW },
+  { id: 'vellamunda',   name: 'Chennai',          profile: 'Dense coastal metro · simulated sector', state: 'EMERGENCY', stateSince: ago(548),  stateAuthorizedBy: 'S. Rajeev Menon',  alertLevel: 'RED',    hazard: 'Urban flood + storm surge',          camps: 4, centroid: [80.2707, 13.0827], createdAt: NOW, updatedAt: NOW },
+  { id: 'chandragiri',  name: 'Cuddalore',        profile: 'Coastal plain · simulated sector',       state: 'ALERT',     stateSince: ago(861),  stateAuthorizedBy: 'A. Prasad Nair',   alertLevel: 'ORANGE', hazard: 'Cyclone track — CAT 2 cone',         camps: 2, centroid: [79.7680, 11.7447], createdAt: NOW, updatedAt: NOW },
+  { id: 'ottakkal',     name: 'Salem',            profile: 'Upland urban · simulated sector',        state: 'NORMAL',    stateSince: null,      stateAuthorizedBy: null,               alertLevel: 'GREEN',  hazard: '—',                                   camps: 0, centroid: [78.1460, 11.6643], createdAt: NOW, updatedAt: NOW },
+  { id: 'karippodu',    name: 'Coimbatore',       profile: 'Western urban hub · simulated sector',   state: 'EMERGENCY', stateSince: ago(1122), stateAuthorizedBy: 'Meera Nandakumar', alertLevel: 'RED',    hazard: 'Urban flood + structural collapse',   camps: 7, centroid: [76.9558, 11.0168], createdAt: NOW, updatedAt: NOW },
+  { id: 'nedumbara',    name: 'Tiruchirappalli',  profile: 'Central urban corridor · simulated',     state: 'ALERT',     stateSince: ago(387),  stateAuthorizedBy: 'R. Devika',        alertLevel: 'ORANGE', hazard: 'Dam release — 3 shutters open',       camps: 1, centroid: [78.7047, 10.7905], createdAt: NOW, updatedAt: NOW },
+  { id: 'thodupara',    name: 'The Nilgiris',     profile: 'High-slope district · simulated sector', state: 'EMERGENCY', stateSince: ago(193),  stateAuthorizedBy: 'K. Ganesan',       alertLevel: 'RED',    hazard: 'Landslide cluster — GSI red',         camps: 3, centroid: [76.6932, 11.4064], createdAt: NOW, updatedAt: NOW },
+  { id: 'manalvayal',   name: 'Nagapattinam',     profile: 'Coastal wetland · simulated sector',     state: 'NORMAL',    stateSince: null,      stateAuthorizedBy: null,               alertLevel: 'GREEN',  hazard: '—',                                   camps: 0, centroid: [79.8430, 10.7672], createdAt: NOW, updatedAt: NOW },
+  { id: 'kanjirode',    name: 'Thanjavur',        profile: 'Delta agriculture · simulated sector',   state: 'NORMAL',    stateSince: null,      stateAuthorizedBy: null,               alertLevel: 'GREEN',  hazard: '—',                                   camps: 0, centroid: [79.1378, 10.7870], createdAt: NOW, updatedAt: NOW },
+  { id: 'poovathur',    name: 'Dindigul',         profile: 'Hill-fringe district · simulated sector', state: 'NORMAL',   stateSince: null,      stateAuthorizedBy: null,               alertLevel: 'GREEN',  hazard: '—',                                   camps: 0, centroid: [77.9803, 10.3673], createdAt: NOW, updatedAt: NOW },
 ];
 
 // ─── INCIDENTS ───────────────────────────────────────────────
@@ -52,7 +52,7 @@ export const DEMO_INCIDENTS: Incident[] = [
   {
     id: 'INC-2041', parentId: null, type: 'collapse', severity: 0, status: 'IN_PROGRESS',
     title: 'Collapse — 6 trapped, Ward 12', description: 'Multi-storey residential collapse with 6 confirmed trapped persons. North face voids marked for cutting access.',
-    lat: 11.8642, lng: 75.3711, areaId: 'karippodu', source: 'RESPONDER', createdAt: ago(38), reporterId: null,
+    lat: 11.0300, lng: 76.9400, areaId: 'karippodu', source: 'RESPONDER', createdAt: ago(38), reporterId: null,
     responseTargetMin: 60, reports: 4, reportingAgencies: 3, evidenceCount: 3, latestUpdateAt: ago(5),
     assignments: [
       mkAssignment('ndrf', 'NDRF', 'ndrf-11', 'NDRF-11', 'lead', 31),
@@ -63,7 +63,7 @@ export const DEMO_INCIDENTS: Incident[] = [
   {
     id: 'INC-2038', parentId: null, type: 'flood', severity: 0, status: 'ASSIGNED',
     title: 'Rooftop rescue — Cheruvatta colony', description: 'Multiple families stranded on rooftops in Cheruvatta colony. Water level rising.',
-    lat: 12.0184, lng: 75.2907, areaId: 'vellamunda', source: 'RESPONDER', createdAt: ago(74), reporterId: null,
+    lat: 13.1000, lng: 80.2200, areaId: 'vellamunda', source: 'RESPONDER', createdAt: ago(74), reporterId: null,
     responseTargetMin: 60, reports: 6, reportingAgencies: 2, evidenceCount: 2, latestUpdateAt: ago(12),
     assignments: [
       mkAssignment('sdrf', 'SDRF', 'sdrf-02', 'SDRF-02', 'lead', 66),
@@ -73,42 +73,42 @@ export const DEMO_INCIDENTS: Incident[] = [
   {
     id: 'INC-2049', parentId: null, type: 'medical', severity: 0, status: 'REPORTED',
     title: 'Casualty evac — hamlet cut off', description: 'Hamlet cut off by landslide. Casualty needing emergency evacuation.',
-    lat: 11.7411, lng: 75.862, areaId: 'thodupara', source: 'CIVILIAN_VERIFIED', createdAt: ago(6), reporterId: null,
+    lat: 11.5000, lng: 76.6200, areaId: 'thodupara', source: 'CIVILIAN_VERIFIED', createdAt: ago(6), reporterId: null,
     responseTargetMin: 60, reports: 2, reportingAgencies: 1, evidenceCount: 1, latestUpdateAt: ago(3),
     assignments: [],
   },
   {
     id: 'INC-2044', parentId: null, type: 'landslide', severity: 0, status: 'TRIAGED',
     title: 'Slope failure — vehicles buried', description: 'Landslide across bypass road. Two vehicles partially buried. Unknown occupants.',
-    lat: 11.7188, lng: 75.8894, areaId: 'thodupara', source: 'RESPONDER', createdAt: ago(21), reporterId: null,
+    lat: 11.4000, lng: 76.7200, areaId: 'thodupara', source: 'RESPONDER', createdAt: ago(21), reporterId: null,
     responseTargetMin: 60, reports: 3, reportingAgencies: 2, evidenceCount: 2, latestUpdateAt: ago(8),
     assignments: [],
   },
   {
     id: 'INC-2033', parentId: null, type: 'fire', severity: 1, status: 'ASSIGNED',
     title: 'Transformer fire — godown row', description: 'Electrical fire at transformer yard. Wind pushing east toward godown row.',
-    lat: 11.8309, lng: 75.3402, areaId: 'karippodu', source: 'RESPONDER', createdAt: ago(96), reporterId: null,
+    lat: 11.0000, lng: 77.0300, areaId: 'karippodu', source: 'RESPONDER', createdAt: ago(96), reporterId: null,
     responseTargetMin: 360, reports: 2, reportingAgencies: 1, evidenceCount: 1, latestUpdateAt: ago(20),
     assignments: [mkAssignment('fire', 'Fire Force', 'fire-04', 'FIRE-04', 'lead', 88)],
   },
   {
     id: 'INC-2030', parentId: null, type: 'medical', severity: 1, status: 'IN_PROGRESS',
     title: 'Dialysis patients cut off at PHC', description: 'Primary health centre submerged. 4 dialysis patients unable to reach treatment.',
-    lat: 12.062, lng: 75.3355, areaId: 'vellamunda', source: 'RESPONDER', createdAt: ago(142), reporterId: null,
+    lat: 13.0300, lng: 80.1900, areaId: 'vellamunda', source: 'RESPONDER', createdAt: ago(142), reporterId: null,
     responseTargetMin: 360, reports: 1, reportingAgencies: 1, evidenceCount: 1, latestUpdateAt: ago(45),
     assignments: [mkAssignment('medical', 'Medical', 'med-05', 'MED-05', 'lead', 130)],
   },
   {
     id: 'INC-2046', parentId: null, type: 'flood', severity: 1, status: 'REPORTED',
     title: 'Bund breach widening, canal road', description: '12 civilian reports of bund breach widening on canal road. Unverified.',
-    lat: 11.9903, lng: 75.2611, areaId: 'vellamunda', source: 'CIVILIAN_UNVERIFIED', createdAt: ago(11), reporterId: null,
+    lat: 12.9700, lng: 80.2400, areaId: 'vellamunda', source: 'CIVILIAN_UNVERIFIED', createdAt: ago(11), reporterId: null,
     responseTargetMin: 360, reports: 12, reportingAgencies: 0, evidenceCount: 0, latestUpdateAt: ago(5),
     assignments: [],
   },
   {
     id: 'INC-2022', parentId: null, type: 'gas', severity: 1, status: 'IN_PROGRESS',
     title: 'LPG leak — bottling unit gate 3', description: 'Gas leak at LPG bottling facility. Perimeter established. Gas detector readings logged.',
-    lat: 11.8471, lng: 75.4066, areaId: 'karippodu', source: 'RESPONDER', createdAt: ago(268), reporterId: null,
+    lat: 10.9500, lng: 76.9300, areaId: 'karippodu', source: 'RESPONDER', createdAt: ago(268), reporterId: null,
     responseTargetMin: 360, reports: 2, reportingAgencies: 2, evidenceCount: 2, latestUpdateAt: ago(30),
     assignments: [
       mkAssignment('fire', 'Fire Force', 'fire-09', 'FIRE-09', 'lead', 255),
@@ -118,42 +118,42 @@ export const DEMO_INCIDENTS: Incident[] = [
   {
     id: 'INC-2027', parentId: null, type: 'road', severity: 2, status: 'ASSIGNED',
     title: 'Bridge approach washed out — MDR-14', description: 'Bridge approach road severely scoured. Closure barricaded.',
-    lat: 11.7002, lng: 75.9215, areaId: 'thodupara', source: 'RESPONDER', createdAt: ago(205), reporterId: null,
+    lat: 11.3200, lng: 76.6200, areaId: 'thodupara', source: 'RESPONDER', createdAt: ago(205), reporterId: null,
     responseTargetMin: 1440, reports: 3, reportingAgencies: 2, evidenceCount: 1, latestUpdateAt: ago(60),
     assignments: [mkAssignment('police', 'Police', 'pol-17', 'POL-17', 'lead', 190)],
   },
   {
     id: 'INC-2035', parentId: null, type: 'power', severity: 2, status: 'TRIAGED',
     title: 'HT line down across market street', description: 'High-tension power line fallen across market street. Area cordoned.',
-    lat: 11.8955, lng: 75.6402, areaId: 'nedumbara', source: 'CIVILIAN_VERIFIED', createdAt: ago(118), reporterId: null,
+    lat: 10.7905, lng: 78.7047, areaId: 'nedumbara', source: 'CIVILIAN_VERIFIED', createdAt: ago(118), reporterId: null,
     responseTargetMin: 1440, reports: 5, reportingAgencies: 1, evidenceCount: 0, latestUpdateAt: ago(50),
     assignments: [],
   },
   {
     id: 'INC-2052', parentId: null, type: 'road', severity: 2, status: 'REPORTED',
     title: 'Culvert washout on plateau link road', description: 'Culvert washout reported on plateau link road. Civilian verified.',
-    lat: 12.0912, lng: 75.8104, areaId: 'ottakkal', source: 'CIVILIAN_VERIFIED', createdAt: ago(47), reporterId: null,
+    lat: 11.6643, lng: 78.1460, areaId: 'ottakkal', source: 'CIVILIAN_VERIFIED', createdAt: ago(47), reporterId: null,
     responseTargetMin: 1440, reports: 2, reportingAgencies: 0, evidenceCount: 0, latestUpdateAt: ago(20),
     assignments: [],
   },
   {
     id: 'INC-2018', parentId: null, type: 'supply', severity: 3, status: 'ASSIGNED',
     title: 'Relief stock short — Camp 3', description: 'Camp 3 reporting bedding and ration shortfall for 189 occupants.',
-    lat: 12.0448, lng: 75.612, areaId: 'chandragiri', source: 'RESPONDER', createdAt: ago(311), reporterId: null,
+    lat: 11.7447, lng: 79.7680, areaId: 'chandragiri', source: 'RESPONDER', createdAt: ago(311), reporterId: null,
     responseTargetMin: 4320, reports: 1, reportingAgencies: 1, evidenceCount: 2, latestUpdateAt: ago(80),
     assignments: [mkAssignment('sdrf', 'SDRF', 'sdrf-07', 'SDRF-07', 'lead', 296)],
   },
   {
     id: 'INC-2054', parentId: null, type: 'supply', severity: 3, status: 'TRIAGED',
     title: 'Fodder drop request — forest fringe', description: 'Livestock in forest fringe area needing fodder drop.',
-    lat: 11.682, lng: 75.889, areaId: 'poovathur', source: 'RESPONDER', createdAt: ago(402), reporterId: null,
+    lat: 10.3673, lng: 77.9803, areaId: 'poovathur', source: 'RESPONDER', createdAt: ago(402), reporterId: null,
     responseTargetMin: 4320, reports: 1, reportingAgencies: 1, evidenceCount: 0, latestUpdateAt: ago(120),
     assignments: [],
   },
   {
     id: 'INC-2015', parentId: null, type: 'rescue', severity: 3, status: 'RESOLVED_PENDING_VERIFICATION',
     title: 'Waterlogging cleared — Ward 4', description: 'Waterlogging in Ward 4 has been cleared. Awaiting CPOC verification.',
-    lat: 11.862, lng: 75.5588, areaId: 'nedumbara', source: 'RESPONDER', createdAt: ago(342), reporterId: null,
+    lat: 10.8050, lng: 78.6900, areaId: 'nedumbara', source: 'RESPONDER', createdAt: ago(342), reporterId: null,
     responseTargetMin: 4320, reports: 2, reportingAgencies: 1, evidenceCount: 1, latestUpdateAt: ago(15),
     assignments: [mkAssignment('sdrf', 'SDRF', 'sdrf-07', 'SDRF-07', 'lead', 330)],
   },
@@ -167,13 +167,13 @@ DEMO_INCIDENTS.forEach(inc => {
 // ─── UNITS ───────────────────────────────────────────────────
 
 export const DEMO_UNITS: Unit[] = [
-  { id: 'ndrf-11', agencyId: 'ndrf', agencyCode: 'NDRF', callSign: 'NDRF-11', status: 'ENGAGED', areaId: 'karippodu', lat: 11.862, lng: 75.375, locationTimestamp: ago(2), capabilities: ['cutting', 'search dog', 'swift-water'], personnelCount: 14, note: '14 pax · cutting + search dog', assignedIncidentId: 'INC-2041', taskDurationMin: 31, fatigueWarning: false, acknowledged: true },
-  { id: 'fire-04', agencyId: 'fire', agencyCode: 'FIRE', callSign: 'FIRE-04', status: 'EN_ROUTE', areaId: 'karippodu', lat: 11.835, lng: 75.345, locationTimestamp: ago(1), capabilities: ['fire suppression', 'hazmat'], personnelCount: 8, note: '2 tenders · ETA 6 min', assignedIncidentId: 'INC-2033', taskDurationMin: 88, fatigueWarning: false, acknowledged: true },
-  { id: 'sdrf-02', agencyId: 'sdrf', agencyCode: 'SDRF', callSign: 'SDRF-02', status: 'ENGAGED', areaId: 'vellamunda', lat: 12.016, lng: 75.292, locationTimestamp: ago(3), capabilities: ['swift-water', 'boat operator'], personnelCount: 10, note: '2 boats · swift-water', assignedIncidentId: 'INC-2038', taskDurationMin: 66, fatigueWarning: false, acknowledged: true },
-  { id: 'med-05', agencyId: 'medical', agencyCode: 'MEDICAL', callSign: 'MED-05', status: 'ENGAGED', areaId: 'vellamunda', lat: 12.06, lng: 75.34, locationTimestamp: ago(5), capabilities: ['emergency medical', 'triage'], personnelCount: 6, note: 'Mobile medical team', assignedIncidentId: 'INC-2030', taskDurationMin: 130, fatigueWarning: true, acknowledged: true },
-  { id: 'pol-17', agencyId: 'police', agencyCode: 'POLICE', callSign: 'POL-17', status: 'ENGAGED', areaId: 'thodupara', lat: 11.702, lng: 75.92, locationTimestamp: ago(8), capabilities: ['traffic management', 'crowd control'], personnelCount: 12, note: 'Traffic cordon · MDR-14', assignedIncidentId: 'INC-2027', taskDurationMin: 190, fatigueWarning: true, acknowledged: true },
-  { id: 'sdrf-07', agencyId: 'sdrf', agencyCode: 'SDRF', callSign: 'SDRF-07', status: 'AVAILABLE', areaId: 'nedumbara', lat: 11.865, lng: 75.56, locationTimestamp: ago(10), capabilities: ['swift-water', 'rope rescue'], personnelCount: 9, note: 'Staging · 9 pax uncommitted', assignedIncidentId: null, taskDurationMin: null, fatigueWarning: false, acknowledged: true },
-  { id: 'fire-09', agencyId: 'fire', agencyCode: 'FIRE', callSign: 'FIRE-09', status: 'UNREACHABLE', areaId: 'karippodu', lat: 11.847, lng: 75.407, locationTimestamp: ago(45), capabilities: ['fire suppression', 'hazmat', 'gas detection'], personnelCount: 6, note: 'Last contact 45m ago — mesh gateway', assignedIncidentId: 'INC-2022', taskDurationMin: 255, fatigueWarning: true, acknowledged: false },
+  { id: 'ndrf-11', agencyId: 'ndrf', agencyCode: 'NDRF', callSign: 'NDRF-11', status: 'ENGAGED', areaId: 'karippodu', lat: 11.0200, lng: 76.9600, locationTimestamp: ago(2), capabilities: ['cutting', 'search dog', 'swift-water'], personnelCount: 14, note: '14 pax · cutting + search dog', assignedIncidentId: 'INC-2041', taskDurationMin: 31, fatigueWarning: false, acknowledged: true },
+  { id: 'fire-04', agencyId: 'fire', agencyCode: 'FIRE', callSign: 'FIRE-04', status: 'EN_ROUTE', areaId: 'karippodu', lat: 11.0340, lng: 76.9660, locationTimestamp: ago(1), capabilities: ['fire suppression', 'hazmat'], personnelCount: 8, note: '2 tenders · ETA 6 min', assignedIncidentId: 'INC-2033', taskDurationMin: 88, fatigueWarning: false, acknowledged: true },
+  { id: 'sdrf-02', agencyId: 'sdrf', agencyCode: 'SDRF', callSign: 'SDRF-02', status: 'ENGAGED', areaId: 'vellamunda', lat: 13.0790, lng: 80.2660, locationTimestamp: ago(3), capabilities: ['swift-water', 'boat operator'], personnelCount: 10, note: '2 boats · swift-water', assignedIncidentId: 'INC-2038', taskDurationMin: 66, fatigueWarning: false, acknowledged: true },
+  { id: 'med-05', agencyId: 'medical', agencyCode: 'MEDICAL', callSign: 'MED-05', status: 'ENGAGED', areaId: 'vellamunda', lat: 13.0580, lng: 80.2460, locationTimestamp: ago(5), capabilities: ['emergency medical', 'triage'], personnelCount: 6, note: 'Mobile medical team', assignedIncidentId: 'INC-2030', taskDurationMin: 130, fatigueWarning: true, acknowledged: true },
+  { id: 'pol-17', agencyId: 'police', agencyCode: 'POLICE', callSign: 'POL-17', status: 'ENGAGED', areaId: 'thodupara', lat: 11.3880, lng: 76.6810, locationTimestamp: ago(8), capabilities: ['traffic management', 'crowd control'], personnelCount: 12, note: 'Traffic cordon · MDR-14', assignedIncidentId: 'INC-2027', taskDurationMin: 190, fatigueWarning: true, acknowledged: true },
+  { id: 'sdrf-07', agencyId: 'sdrf', agencyCode: 'SDRF', callSign: 'SDRF-07', status: 'AVAILABLE', areaId: 'nedumbara', lat: 10.8000, lng: 78.7000, locationTimestamp: ago(10), capabilities: ['swift-water', 'rope rescue'], personnelCount: 9, note: 'Staging · 9 pax uncommitted', assignedIncidentId: null, taskDurationMin: null, fatigueWarning: false, acknowledged: true },
+  { id: 'fire-09', agencyId: 'fire', agencyCode: 'FIRE', callSign: 'FIRE-09', status: 'UNREACHABLE', areaId: 'karippodu', lat: 10.9920, lng: 76.9510, locationTimestamp: ago(45), capabilities: ['fire suppression', 'hazmat', 'gas detection'], personnelCount: 6, note: 'Last contact 45m ago — mesh gateway', assignedIncidentId: 'INC-2022', taskDurationMin: 255, fatigueWarning: true, acknowledged: false },
 ];
 
 // ─── CPOC RECORDS ────────────────────────────────────────────
