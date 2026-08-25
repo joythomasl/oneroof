@@ -1,23 +1,4 @@
-"""
-ONE ROOF - User Store (Person 5B)
-
-An in-memory user repository with the exact shape a database-backed
-repository would have. Person 5A's SQLAlchemy session is not required
-for auth to work, and when it lands only this file changes.
-
-INTEGRATION POINT (Person 5A)
------------------------------
-Replace the three method bodies below with real queries:
-
-    async def get_by_phone(self, phone):
-        return await session.scalar(select(User).where(User.phone == phone))
-
-The call sites in routers/auth.py and app/dependencies.py do not change.
-
-WARNING: state lives in the process. Restarting uvicorn forgets every
-user. That is acceptable for a hackathon prototype and is reported
-honestly by /health as `user_store: "memory"`.
-"""
+"""Database-backed user repository with a resilient in-memory fallback."""
 
 from __future__ import annotations
 
@@ -25,33 +6,74 @@ import logging
 from typing import Dict, List, Optional
 from uuid import UUID
 
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.database import SessionLocal
+from app.models.database_records import UserRecord
 from app.models.user import User, UserRole
 
 logger = logging.getLogger(__name__)
 
 
 class UserStore:
-    """Phone-keyed user repository."""
-
-    #: Flips to "database" when Person 5A's layer is wired in.
-    backend: str = "memory"
-
     def __init__(self) -> None:
         self._by_phone: Dict[str, User] = {}
         self._by_id: Dict[UUID, User] = {}
+        self._database_available = True
 
-    # -- Reads ------------------------------------------------
+    @property
+    def backend(self) -> str:
+        return "database" if self._database_available else "memory-fallback"
+
+    @staticmethod
+    def _domain(row: UserRecord) -> User:
+        return User(
+            id=UUID(row.id),
+            phone=row.phone,
+            name=row.name,
+            role=UserRole(row.role),
+            is_active=row.is_active,
+            created_at=row.created_at,
+        )
+
+    def _remember(self, user: User) -> User:
+        self._by_phone[user.phone] = user
+        self._by_id[user.id] = user
+        return user
+
+    def _database_failed(self, exc: Exception) -> None:
+        self._database_available = False
+        logger.warning("User database unavailable; using memory fallback: %s", exc)
 
     async def get_by_phone(self, phone: str) -> Optional[User]:
-        return self._by_phone.get(phone)
+        try:
+            with SessionLocal() as db:
+                row = db.query(UserRecord).filter(UserRecord.phone == phone).one_or_none()
+                self._database_available = True
+                return self._remember(self._domain(row)) if row else None
+        except SQLAlchemyError as exc:
+            self._database_failed(exc)
+            return self._by_phone.get(phone)
 
     async def get_by_id(self, user_id: UUID) -> Optional[User]:
-        return self._by_id.get(user_id)
+        try:
+            with SessionLocal() as db:
+                row = db.get(UserRecord, str(user_id))
+                self._database_available = True
+                return self._remember(self._domain(row)) if row else None
+        except SQLAlchemyError as exc:
+            self._database_failed(exc)
+            return self._by_id.get(user_id)
 
     async def list_users(self) -> List[User]:
-        return list(self._by_phone.values())
-
-    # -- Writes -----------------------------------------------
+        try:
+            with SessionLocal() as db:
+                users = [self._remember(self._domain(row)) for row in db.query(UserRecord).all()]
+                self._database_available = True
+                return users
+        except SQLAlchemyError as exc:
+            self._database_failed(exc)
+            return list(self._by_phone.values())
 
     async def get_or_create(
         self,
@@ -59,61 +81,67 @@ class UserStore:
         role: UserRole = UserRole.CITIZEN,
         name: Optional[str] = None,
     ) -> User:
-        """
-        Return the existing user for *phone*, or create one.
-
-        First login creates a `citizen`. Promotion to responder or
-        cpoc_admin is an explicit admin action - never inferred.
-        """
-        existing = self._by_phone.get(phone)
-        if existing is not None:
-            return existing
-
-        user = User(phone=phone, role=role, name=name)
-        self._by_phone[phone] = user
-        self._by_id[user.id] = user
-        logger.info("Created user %s (%s) with role '%s'.", user.id, phone, role.value)
-        return user
+        try:
+            with SessionLocal() as db:
+                row = db.query(UserRecord).filter(UserRecord.phone == phone).one_or_none()
+                if row is None:
+                    row = UserRecord(phone=phone, role=role.value, name=name)
+                    db.add(row)
+                    db.commit()
+                    db.refresh(row)
+                self._database_available = True
+                return self._remember(self._domain(row))
+        except SQLAlchemyError as exc:
+            self._database_failed(exc)
+            existing = self._by_phone.get(phone)
+            if existing is not None:
+                return existing
+            return self._remember(User(phone=phone, role=role, name=name))
 
     async def set_role(self, user_id: UUID, role: UserRole) -> Optional[User]:
-        user = self._by_id.get(user_id)
-        if user is None:
-            return None
-        user.role = role
-        logger.info("User %s role changed to '%s'.", user_id, role.value)
-        return user
+        try:
+            with SessionLocal() as db:
+                row = db.get(UserRecord, str(user_id))
+                if row is None:
+                    return None
+                row.role = role.value
+                db.commit()
+                db.refresh(row)
+                self._database_available = True
+                return self._remember(self._domain(row))
+        except SQLAlchemyError as exc:
+            self._database_failed(exc)
+            user = self._by_id.get(user_id)
+            if user is not None:
+                user.role = role
+            return user
 
     async def set_active(self, user_id: UUID, is_active: bool) -> Optional[User]:
-        user = self._by_id.get(user_id)
-        if user is None:
-            return None
-        user.is_active = is_active
-        return user
-
-    # -- Development helper -----------------------------------
+        try:
+            with SessionLocal() as db:
+                row = db.get(UserRecord, str(user_id))
+                if row is None:
+                    return None
+                row.is_active = is_active
+                db.commit()
+                db.refresh(row)
+                self._database_available = True
+                return self._remember(self._domain(row))
+        except SQLAlchemyError as exc:
+            self._database_failed(exc)
+            user = self._by_id.get(user_id)
+            if user is not None:
+                user.is_active = is_active
+            return user
 
     async def seed_demo_users(self) -> None:
-        """
-        Create one user per role so RBAC is testable without a database.
-
-        Only runs when ENVIRONMENT=development. These are login-by-OTP
-        accounts - no passwords exist, so seeding them grants nothing
-        an attacker could not get by requesting an OTP.
-        """
         demo = [
             ("9000000001", UserRole.CITIZEN, "Demo Citizen"),
             ("9000000002", UserRole.RESPONDER, "Demo Responder"),
             ("9000000003", UserRole.CPOC_ADMIN, "Demo CPOC Admin"),
         ]
         for phone, role, name in demo:
-            if phone not in self._by_phone:
-                user = User(phone=phone, role=role, name=name)
-                self._by_phone[phone] = user
-                self._by_id[user.id] = user
-        logger.info(
-            "Seeded %d demo users (citizen/responder/cpoc_admin).", len(demo)
-        )
+            await self.get_or_create(phone, role, name)
 
 
-# Module-level singleton
 user_store = UserStore()
