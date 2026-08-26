@@ -50,6 +50,7 @@ app.*.map.json
 
 # Local tool configuration accidentally created inside the workspace
 ~/
+.person5-ready-worktree/
 
 # Python caches and environments
 __pycache__/
