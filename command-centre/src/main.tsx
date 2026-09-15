@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
-import './styles/layout.css';
+import './styles/command.css';
 
 // Theme bootstrap — runs before the app paints so a stored override never flashes.
 (function () {

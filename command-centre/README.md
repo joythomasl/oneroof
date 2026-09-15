@@ -1,6 +1,6 @@
-# UNIRES Command Centre
+# UNIRES State Command Centre
 
-React + TypeScript rewrite of the UNIRES State Command Centre prototype. The app reproduces the original operational dashboard as a component-based Vite project with two switchable scenarios: a fictional Kanara State demo and a reconstructed 2018 Kerala floods training replay.
+UNIRES is a React and TypeScript operational command-and-coordination interface for state disaster response. It preserves the map-linked incident flow, severity model, district drill-down, agency assignments, evidence, scenario switching, themes, unit markers, and replay capability of the earlier dashboard while putting unmet command decisions first.
 
 ## Run locally
 
@@ -11,7 +11,25 @@ npm install
 npm run dev
 ```
 
-Vite prints the local preview address, normally `http://localhost:5173/`.
+The normal local address is `http://localhost:5173/`.
+
+## Operational workflow
+
+1. Start in **Attention**. Read the exception bar, then work down the ranked queue. The reason for each rank is explicit; no opaque score is used.
+2. Select an incident from the queue or map. Review its next action, owner, acknowledgement, deadline, blocker, people impact, access, forecast, and trust record.
+3. Use the persistent action bar to assign a resource, request an update, change status, escalate, or log a decision. Consequential changes receive a summary before confirmation and create an audit record.
+4. Use **Situation** for the common operating picture, district drill-down, verification inbox, and casualty/rescue reconciliation.
+5. Use **Operations** for operational tasks and command-authority decisions. Incidents and tasks remain separate records.
+6. Use **Resources** to search capability, resolve unmet requests, inspect assignments, identify communications/work-rest problems, and avoid double booking.
+7. Use **Coordination** for the active command structure, agency hand-offs, acknowledgement gaps, and the 3W view.
+8. Use **Planning & Log** for the operational period, versioned IAPs, verified-only SITREP drafts, handover material, and the command log.
+9. Open the audit drawer from the command header to search changes and inspect previous/new values, rationale, source, and sync state.
+
+Historical replay always shows a scenario timestamp and a separate current operator timestamp. Exercise and historical records carry persistent non-operational labels. Replay controls step through scenario time rather than presenting a decorative clock.
+
+## Connectivity behavior
+
+The notification panel includes a connectivity simulator for Online, Degraded, Offline, Synchronising, and Conflict states. When offline, authorised mutations remain local, their audit events are marked pending, and the interface states clearly that field agencies have not received them. The last successful sync remains visible.
 
 ## Quality checks
 
@@ -21,58 +39,36 @@ npm run lint
 npm run build
 ```
 
-The interaction suite covers the dashboard shell, map and issue synchronization, district filtering, CPOC/channel workflow, evidence gallery/lightbox, panel controls, and theme switching.
+The automated suite covers priority ranking, task exceptions, Kerala geography, time separation, resource double-booking, invalid transitions, offline queueing, sync conflicts, audit creation, keyboard incident/filter use, persistent actions, colour-independent severity, all three operational modes, and both themes.
 
-See [REQUIREMENTS.md](./REQUIREMENTS.md) for tester prerequisites and [TESTING.md](./TESTING.md) for the complete manual feature checklist.
+Requested viewport captures are in `screenshots/`:
 
-## Implemented features
-
-- Map-first command-centre layout with nine scenario districts over a locally bundled satellite basemap
-- Kanara fictional live demo as the default, with the 2018 Kerala floods historical replay still available from the scenario switcher
-- Live simulation clock using the current system date and time while historical evidence retains its original context
-- Persistent training-data and schematic-map disclosures in historical mode
-- District NORMAL, ALERT, and EMERGENCY states in operational summaries and district cards
-- Borderless satellite map with interactive P0-P3 risk pointers, type glyphs, status rings, overdue pulse, and report counts
-- Deployed agency-unit badges and status indicators
-- Mouse-wheel zoom, drag pan, zoom controls, and keyboard selection
-- Synchronized incident map markers and issue worklist
-- Severity, type, status, agency, and district filters
-- Expandable incident details, agency assignments, reassignment, and activity trail
-- District card with CPOC and photo actions
-- CPOC loading, error, missing, acting-deputy, contact, message, and handover states
-- Phone, email, and district-net channel chooser
-- Geotagged evidence gallery and full metadata lightbox
-- Live clock, elapsed-emergency timer, status counters, and emergency-district popover
-- Persistent dark/light theme shortcut plus account-menu system, light, and dark controls
-- Responsive desktop and tablet layouts
+- `attention-1920x1080.png`
+- `attention-1440x900.png`
+- `attention-1280x720.png`
 
 ## Project structure
 
-- `src/components/` - dashboard, panel, filters, overlays, and shared UI
-- `src/components/map/` - reusable SVG operational map and map overlays
-- `src/components/modals/` - CPOC, channel, gallery, and lightbox workflows
-- `src/demo/` - scenario registry, fictional fixtures, reconstructed replay records, and evidence fixtures
-- `src/services/` - mock API boundary, CPOC cache, reassignment, and audit events
-- `src/stores/` - Zustand UI state
-- `src/styles/` - design tokens and application layout
-- `src/test/` - interaction tests
-- `src/types/` - shared domain types
+- `src/components/command/` — command shell, exception bar, map, workspaces, incident detail, and audit drawer
+- `src/demo/commandData.ts` — normalized live, exercise, and historical scenario graphs
+- `src/services/commandLogic.ts` — ranking and operational validation rules
+- `src/services/format.ts` — centralized scenario-aware formatting
+- `src/stores/commandStore.ts` — domain mutations, URL state, replay, connectivity, and audit generation
+- `src/types/operations.ts` — normalized operational entities and shared state vocabularies
+- `src/test/` — domain and accessible interaction tests
 
-## Integration boundary
+See [ARCHITECTURE_AUDIT.md](./ARCHITECTURE_AUDIT.md), [DATA_MODEL.md](./DATA_MODEL.md), [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md), and [TESTING.md](./TESTING.md) for implementation detail.
 
-All current records are demo data. The Kerala replay uses the disaster's documented timeframe and affected-district context, but its district state values, incident queue, unit positions, camp counts, evidence, identities, and contact routes are reconstructed for training. The SVG is a schematic operational layout rather than authoritative Kerala GIS geometry.
+## Remaining backend and integration work
 
-The UI reads CPOC and incident mutations through `src/services/api.ts`, which is the intended replacement point for a real backend and realtime transport. The dashboard is reactive and interactive, but it is not yet database-backed or genuinely realtime.
+- Replace normalized demo factories with authenticated realtime APIs and durable storage.
+- Enforce status transitions, resource locks, acknowledgement deadlines, and audit immutability server-side.
+- Add authoritative GIS boundaries, live hazard/rainfall/gauge feeds, marker clustering, route services, and offline tile packages.
+- Implement service-worker caching, encrypted local mutation queues, and multi-device conflict reconciliation.
+- Connect agency radio, satellite, messaging, and heartbeat gateways.
+- Add identity, role-based authorisation, delegation, digital approvals, and data-classification controls.
+- Generate signed IAP/SITREP exports and after-action packages.
+- Integrate optional air-operations, volunteer-management, and critical-infrastructure modules.
+- Validate content and workflows with trained incident-management practitioners before operational use.
 
-## Difference from `command-centre.html`
-
-The original prototype is one 2,700+ line HTML file with inline CSS, hardcoded data, mutable global state, and imperative render functions. This project separates typed domain data, reusable React components, shared Zustand state, services, and styles. The scenario switch updates the header, clock, colour-coded risk pointers, incidents, units, district cards, contacts, and evidence together without editing the UI code. It also adds automated interaction tests and production build/type checks.
-
-Both versions currently simulate their data source. To become operationally realtime, `src/services/api.ts` still needs to be connected to authenticated backend endpoints and a subscription transport such as WebSocket, Server-Sent Events, or Supabase Realtime.
-
-## Historical replay basis
-
-Scenario framing is based on the Government of Kerala/KSDMA 2018 flood documentation and the government-led Post-Disaster Needs Assessment. It is a nine-district operational subset, not a reproduction of every affected district or an event-level source dataset.
-
-- [Kerala State Disaster Management Authority — Floods 2018](https://sdma.kerala.gov.in/floods_2018/)
-- [UNDP — Post-Disaster Needs Assessment: Kerala](https://www.undp.org/publications/post-disaster-needs-assessment-kerala)
+All current people, contact routes, incidents, resources, and live conditions are fictional or reconstructed training data. The application must not be used for real operational tasking without the integrations and assurance work above.

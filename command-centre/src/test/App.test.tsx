@@ -1,117 +1,102 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
-import { api, NET } from '../services/api';
-import { useUIStore } from '../stores/uiStore';
+import { getScenarioData } from '../demo/commandData';
+import { defaultFilters, useCommandStore } from '../stores/commandStore';
 
 beforeEach(() => {
-  api.invalidateCpoc();
-  NET.latency = 1;
-  NET.failCpoc = false;
-  useUIStore.getState().setScenario('kanara-live');
-  useUIStore.getState().setTheme('light');
-  useUIStore.setState({
-    selectedAreaId: null,
-    selectedIncidentId: null,
-    panelCollapsed: false,
-    cpocModalArea: null,
-    cpocModalIncident: null,
-    chanModalArea: null,
-    chanModalIncident: null,
-    galModalArea: null,
-    galModalIncident: null,
-    lightboxIdx: null,
-    acctMenuOpen: false,
-    districtPopOpen: false,
-    sevFilter: new Set([0, 1, 2, 3]),
-    typeFilter: '',
-    statusFilter: '',
-    agencyFilter: '',
+  useCommandStore.setState({
+    data: getScenarioData('tamil-live'), scenarioId: 'tamil-live', workspace: 'attention', selectedIncidentId: null,
+    selectedDistrictId: null, detailTab: 'overview', filters: defaultFilters, theme: 'light', mapBase: 'operational',
+    auditOpen: false, notificationsOpen: false, mobilePane: 'map', connection: 'online', pendingActionCount: 0,
+    replayPlaying: false, replayOffsetMinutes: 0, announcement: '',
   });
+  document.documentElement.setAttribute('data-theme', 'light');
 });
 
 afterEach(cleanup);
 
-describe('UNIRES Command Centre', () => {
-  it('switches to the historical Kerala replay and resets operational selection', async () => {
+describe('UNIRES operational command centre', () => {
+  it('renders the command band, exceptions, map alternative and ranked action queue', () => {
+    render(<App />);
+    expect(screen.getByText('UNIRES')).toBeInTheDocument();
+    expect(screen.getByText('LIVE OPERATIONS')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /critical unassigned/i })).toBeInTheDocument();
+    expect(screen.getByRole('application', { name: /operational map/i })).toBeInTheDocument();
+    expect(screen.getByRole('listbox', { name: /reported incidents/i })).toBeInTheDocument();
+    expect(within(screen.getByRole('listbox', { name: /reported incidents/i })).getAllByRole('option')[0]).toHaveAccessibleName(/Critical P0.*Care home evacuation.*UNASSIGNED/i);
+  });
+
+  it('keeps historical scenario time distinct from current operator time', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.selectOptions(screen.getByRole('combobox', { name: /Command centre scenario/i }), 'kerala-2018');
-    expect(screen.getByText('HISTORICAL REPLAY')).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(String(new Date().getFullYear())))).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: /Rooftop rescues — Aluva sector/i })).toBeInTheDocument();
-    expect(screen.getAllByText(/not an authoritative incident log/i)).toHaveLength(2);
-    await user.click(screen.getByRole('option', { name: /Rooftop rescues — Aluva sector/i }));
-    expect(screen.getAllByText(/not an authoritative incident log/i)).toHaveLength(1);
+    expect(screen.getByText('HISTORICAL REPLAY — TRAINING DATA')).toBeInTheDocument();
+    expect(screen.getAllByText(/2018/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(new RegExp(String(new Date().getFullYear()))).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /Step backward/i })).toBeInTheDocument();
   });
 
-  it('renders the operational shell, map, status, and incident worklist', () => {
-    render(<App />);
-    expect(screen.getByText('UNIRES')).toBeInTheDocument();
-    expect(screen.getByText(/districts active/i)).toBeInTheDocument();
-    expect(screen.getByRole('application', { name: /operational map/i })).toBeInTheDocument();
-    expect(screen.getByRole('listbox', { name: /reported incidents/i })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: /Collapse — 6 trapped/i })).toBeInTheDocument();
-  });
-
-  it('keeps district selection, filter state, and district card synchronized', async () => {
+  it('supports keyboard incident selection and exposes colour-independent severity text', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('button', { name: /districts active/i }));
-    await user.click(screen.getByRole('button', { name: /Coimbatore.*open incidents/i }));
-    expect(screen.getByRole('button', { name: /Clear district filter/i })).toBeInTheDocument();
-    expect(screen.getByText('Western urban hub · simulated sector')).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: /Rooftop rescue/i })).not.toBeInTheDocument();
+    const first = within(screen.getByRole('listbox', { name: /reported incidents/i })).getAllByRole('option')[0];
+    first.focus();
+    await user.keyboard('{Enter}');
+    expect(first).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getAllByText('Critical · P0').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /Assign resource/i })).toBeInTheDocument();
   });
 
-  it('opens the CPOC workflow and available channel chooser', async () => {
+  it('supports labelled filters using the keyboard', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('button', { name: /districts active/i }));
-    await user.click(screen.getByRole('button', { name: /Coimbatore.*open incidents/i }));
-    await user.click(screen.getByRole('button', { name: /Contact CPOC/i }));
-    expect((await screen.findAllByText(/Meera Nandakumar/i)).length).toBeGreaterThan(0);
-    await user.click(screen.getByRole('button', { name: /Choose channel/i }));
-    expect(screen.getAllByRole('dialog', { name: /Contact CPOC/i })).toHaveLength(2);
-    expect(screen.getAllByText('cpoc.karippodu@kanara.gov.in').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('KRP-1').length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^Filters/i }));
+    const severity = screen.getByLabelText('Severity');
+    severity.focus();
+    await user.selectOptions(severity, '1');
+    expect(screen.queryByRole('option', { name: /Care home evacuation/i })).not.toBeInTheDocument();
   });
 
-  it('opens the evidence gallery and full metadata lightbox', async () => {
+  it('records operational changes in the audit log', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('button', { name: /districts active/i }));
-    await user.click(screen.getByRole('button', { name: /Coimbatore.*open incidents/i }));
-    await user.click(screen.getByRole('button', { name: /Photos \(6\)/i }));
-    expect(screen.getByRole('dialog', { name: /Photo evidence/i })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Initial report — north face/i }));
-    expect(screen.getByRole('dialog', { name: /Photo evidence viewer/i })).toBeInTheDocument();
-    expect(screen.getByText('Capture metadata')).toBeInTheDocument();
-    expect(screen.getByText('a91f2c…7d3c')).toBeInTheDocument();
+    await user.click(within(screen.getByRole('listbox', { name: /reported incidents/i })).getAllByRole('option')[0]);
+    await user.click(screen.getByRole('button', { name: /Request update/i }));
+    await user.click(screen.getByRole('button', { name: /Open audit log/i }));
+    expect(screen.getByRole('dialog', { name: /Audit log/i })).toBeInTheDocument();
+    expect(screen.getByText('Requested field update')).toBeInTheDocument();
   });
 
-  it('filters by severity and supports panel collapse/expand', async () => {
+  it('queues authorised actions explicitly while offline', () => {
+    const store = useCommandStore.getState();
+    store.setConnection('offline');
+    store.requestUpdate('TN-INC-041');
+    const next = useCommandStore.getState();
+    expect(next.pendingActionCount).toBe(1);
+    expect(next.data.audit[0].syncState).toBe('pending');
+    expect(next.announcement).toMatch(/queued locally/i);
+  });
+
+  it('shows synchronisation conflicts as a global failure state', () => {
+    useCommandStore.getState().setConnection('conflict');
+    render(<App />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/conflict requires resolution/i);
+  });
+
+  it('switches live, exercise and historical modes without ambiguity', async () => {
     const user = userEvent.setup();
     render(<App />);
-    const p0 = screen.getByRole('button', { name: 'P0' });
-    await user.click(p0);
-    expect(screen.queryByRole('option', { name: /Collapse — 6 trapped/i })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Collapse panel/i }));
-    expect(screen.getByTitle('Expand panel')).toBeInTheDocument();
-    fireEvent.click(screen.getByTitle('Expand panel'));
-    await waitFor(() => expect(screen.getByRole('button', { name: /Collapse panel/i })).toBeInTheDocument());
+    const scenario = screen.getByRole('combobox', { name: /Command centre scenario/i });
+    expect(screen.getByText('LIVE OPERATIONS')).toBeInTheDocument();
+    await user.selectOptions(scenario, 'tamil-exercise');
+    expect(screen.getByText('EXERCISE — NOT OPERATIONAL')).toBeInTheDocument();
+    await user.selectOptions(scenario, 'kerala-2018');
+    expect(screen.getByText('HISTORICAL REPLAY — TRAINING DATA')).toBeInTheDocument();
   });
 
-  it('switches theme from the account controls', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole('button', { name: /D. Krishnankutty/i }));
-    await user.click(screen.getByRole('button', { name: /^Dark$/i }));
-    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
-  });
-
-  it('switches theme from the persistent header control', async () => {
+  it('switches between light and low-light themes', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('button', { name: /Switch to dark theme/i }));
@@ -120,31 +105,13 @@ describe('UNIRES Command Centre', () => {
     expect(document.documentElement).toHaveAttribute('data-theme', 'light');
   });
 
-  it('selects a colour-coded incident pointer and synchronizes the issue list', async () => {
+  it('keeps critical actions in a persistent action bar at laptop width', async () => {
     const user = userEvent.setup();
     render(<App />);
-    const incidentRow = screen.getByRole('option', { name: /Collapse — 6 trapped/i });
-    await user.click(screen.getByRole('button', { name: /INC-2041, P0 risk, Collapse — 6 trapped/i }));
-    expect(incidentRow).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('exercises the simulated link failure and renders a retryable CPOC error', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole('button', { name: /D. Krishnankutty/i }));
-    await user.click(screen.getByRole('button', { name: 'Fail' }));
-    await user.click(screen.getByRole('button', { name: /districts active/i }));
-    await user.click(screen.getByRole('button', { name: /Coimbatore.*open incidents/i }));
-    await user.click(screen.getByRole('button', { name: /Contact CPOC/i }));
-    expect(await screen.findByText(/CPOC lookup failed/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument();
-  });
-
-  it('reassigns the incident lead and records visible feedback', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole('option', { name: /Collapse — 6 trapped/i }));
-    await user.click(screen.getByRole('button', { name: /Reassign lead/i }));
-    expect(screen.getByText(/INC-2041 re-tasked/i)).toBeInTheDocument();
+    await user.click(within(screen.getByRole('listbox', { name: /reported incidents/i })).getAllByRole('option')[0]);
+    const actions = screen.getByRole('button', { name: /Assign resource/i }).parentElement;
+    expect(actions).toHaveClass('sticky-actions');
+    expect(actions).toHaveTextContent('Escalate');
+    expect(actions).toHaveTextContent('Log decision');
   });
 });
