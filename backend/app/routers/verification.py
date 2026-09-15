@@ -27,12 +27,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.dependencies import require_role
+from app.config import get_settings
 from app.models.events import EventType
+from app.models.photo import PhotoStatus
 from app.models.user import User, UserRole
 from app.services.incident_adapter import (
     VerificationStatus,
     incident_adapter,
 )
+from app.services.geo_validation import distance_meters
+from app.services.photo_store import photo_store
 from app.services.redis_service import redis_service
 from app.services.ws_manager import ws_manager
 
@@ -58,6 +62,10 @@ class VerificationRequest(BaseModel):
         description="Reason for the decision. Required when rejecting.",
         examples=["Confirmed on site by SDRF team 4."],
     )
+    closing_photo_id: Optional[UUID] = Field(
+        default=None,
+        description="Resolved-state photo used for automatic location validation.",
+    )
 
 
 class LocationFlagRequest(BaseModel):
@@ -73,7 +81,7 @@ class LocationFlagRequest(BaseModel):
 
 
 class VerificationResponse(BaseModel):
-    incident_id: UUID
+    incident_id: int
     action: VerificationAction
     status: VerificationStatus
     note: str = ""
@@ -87,21 +95,24 @@ class VerificationResponse(BaseModel):
     existence_checked: bool = False
     #: True only if the event genuinely reached Redis.
     event_published: bool = False
+    location_flagged: bool = False
+    location_distance_meters: Optional[float] = None
 
 
 class VerificationStateResponse(BaseModel):
-    incident_id: UUID
+    incident_id: int
     status: VerificationStatus
     verified_by: Optional[UUID] = None
     verified_at: Optional[datetime] = None
     reason: str = ""
     location_flagged: bool = False
     location_flag_reason: str = ""
+    location_distance_meters: Optional[float] = None
 
 
 # -- Shared helpers -------------------------------------------
 
-async def _assert_incident_exists(incident_id: UUID) -> bool:
+async def _assert_incident_exists(incident_id: int) -> bool:
     """
     404 if Person 5A's lookup says the incident is missing.
 
@@ -124,7 +135,7 @@ async def _assert_incident_exists(incident_id: UUID) -> bool:
     return True
 
 
-async def _emit(event: EventType, incident_id: UUID, data: dict) -> bool:
+async def _emit(event: EventType, incident_id: int, data: dict) -> bool:
     """Publish to Redis; fall back to a local broadcast if Redis is down."""
     published = await redis_service.publish_event(
         event.value, incident_id=str(incident_id), data=data
@@ -154,7 +165,7 @@ async def _emit(event: EventType, incident_id: UUID, data: dict) -> bool:
     },
 )
 async def approve_incident(
-    incident_id: UUID,
+    incident_id: int,
     body: VerificationRequest,
     user: User = Depends(require_role(UserRole.CPOC_ADMIN)),
 ) -> VerificationResponse:
@@ -163,6 +174,43 @@ async def approve_incident(
     published to Redis, reaching every WebSocket client.
     """
     checked = await _assert_incident_exists(incident_id)
+
+    location_distance: Optional[float] = None
+    if body.closing_photo_id is not None:
+        photo = await photo_store.get(body.closing_photo_id)
+        if photo is None:
+            raise HTTPException(status_code=404, detail="Closing photo not found.")
+        if photo.incident_id != incident_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Closing photo is not attached to this incident.",
+            )
+        incident = await incident_adapter.get_incident(incident_id)
+        if photo.latitude is None or photo.longitude is None:
+            await incident_adapter.flag_location(
+                incident_id,
+                "Closing photo has no capture coordinates.",
+                flagged_by=user.id,
+            )
+        elif incident is not None:
+            location_distance = distance_meters(
+                incident.latitude,
+                incident.longitude,
+                photo.latitude,
+                photo.longitude,
+            )
+            maximum = get_settings().CLOSURE_PHOTO_MAX_DISTANCE_METERS
+            if location_distance > maximum:
+                await incident_adapter.flag_location(
+                    incident_id,
+                    f"Closing photo is {location_distance:.1f} m from the incident "
+                    f"(maximum {maximum:.1f} m).",
+                    flagged_by=user.id,
+                    distance_meters=location_distance,
+                )
+        await photo_store.set_status(
+            body.closing_photo_id, PhotoStatus.APPROVED, verified_by=user.id
+        )
 
     record, persisted = await incident_adapter.set_verification(
         incident_id,
@@ -195,6 +243,10 @@ async def approve_incident(
         persisted=persisted,
         existence_checked=checked,
         event_published=published,
+        location_flagged=record.location_flagged,
+        location_distance_meters=(
+            round(location_distance, 1) if location_distance is not None else None
+        ),
     )
 
 
@@ -212,7 +264,7 @@ async def approve_incident(
     },
 )
 async def reject_incident(
-    incident_id: UUID,
+    incident_id: int,
     body: VerificationRequest,
     user: User = Depends(require_role(UserRole.CPOC_ADMIN)),
 ) -> VerificationResponse:
@@ -280,7 +332,7 @@ async def reject_incident(
     },
 )
 async def flag_location(
-    incident_id: UUID,
+    incident_id: int,
     body: LocationFlagRequest,
     user: User = Depends(require_role(UserRole.CPOC_ADMIN)),
 ) -> VerificationResponse:
@@ -322,7 +374,7 @@ async def flag_location(
     summary="Get the current verification state of an incident",
     responses={404: {"description": "No verification recorded"}},
 )
-async def get_verification(incident_id: UUID) -> VerificationStateResponse:
+async def get_verification(incident_id: int) -> VerificationStateResponse:
     record = await incident_adapter.get_verification(incident_id)
     if record is None:
         raise HTTPException(
@@ -337,4 +389,5 @@ async def get_verification(incident_id: UUID) -> VerificationStateResponse:
         reason=record.reason,
         location_flagged=record.location_flagged,
         location_flag_reason=record.location_flag_reason,
+        location_distance_meters=record.location_distance_meters,
     )

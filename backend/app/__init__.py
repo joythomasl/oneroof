@@ -1,1 +1,1 @@
-# ONE ROOF – Backend Application Package
+# ONE ROOF backend application package

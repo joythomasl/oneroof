@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
+import 'report_detail_screen.dart';
 
 /// One field report submitted by a responder.
 // TODO(backend): replace with the API model + a local queue, so reports filed
@@ -14,6 +16,20 @@ class FieldReport {
     required this.status,
     required this.filedAgo,
     required this.agency,
+    this.incidentType = 'Incident report',
+    this.icon = Icons.warning_amber_outlined,
+    this.description = 'Field responder report awaiting coordination review.',
+    this.language = 'English',
+    this.latitude = 9.9312,
+    this.longitude = 76.2673,
+    this.accuracyMetres = 12,
+    this.distanceFromResponderKm = 1.4,
+    this.captureTime = 'Today, 10:24',
+    this.thumbnailBase64,
+    this.photoSha256,
+    this.synced = false,
+    this.timeline = const <ReportEvent>[],
+    this.rejectionReason,
   });
 
   final String id;
@@ -27,6 +43,29 @@ class FieldReport {
   final String status;
   final String filedAgo;
   final String agency;
+  final String incidentType;
+  final IconData icon;
+  final String description;
+  final String language;
+  final double latitude;
+  final double longitude;
+  final double accuracyMetres;
+  final double distanceFromResponderKm;
+  final String captureTime;
+  final String? thumbnailBase64;
+  final String? photoSha256;
+  final bool synced;
+  final List<ReportEvent> timeline;
+  final String? rejectionReason;
+}
+
+class ReportEvent {
+  const ReportEvent(this.label, this.actor, this.role, this.timestamp, {this.syncedLateMinutes});
+  final String label;
+  final String actor;
+  final String role;
+  final String timestamp;
+  final int? syncedLateMinutes;
 }
 
 /// Hardcoded sample data for layout work.
@@ -39,6 +78,9 @@ const List<FieldReport> _sampleReports = <FieldReport>[
     status: 'In Progress',
     filedAgo: '4 min ago',
     agency: 'NDRF',
+    incidentType: 'collapse',
+    icon: Icons.domain_outlined,
+    timeline: <ReportEvent>[ReportEvent('Reported', 'S. Ramesh', 'Responder', '10:24'), ReportEvent('Triaged', 'Anita Joseph', 'CPOC', '10:27', syncedLateMinutes: 2)],
   ),
   FieldReport(
     id: 'RPT-4468',
@@ -48,6 +90,8 @@ const List<FieldReport> _sampleReports = <FieldReport>[
     status: 'Pending Verification',
     filedAgo: '22 min ago',
     agency: 'Fire & Rescue',
+    incidentType: 'gas_leak',
+    icon: Icons.propane_tank_outlined,
   ),
   FieldReport(
     id: 'RPT-4462',
@@ -66,6 +110,9 @@ const List<FieldReport> _sampleReports = <FieldReport>[
     status: 'Reopened',
     filedAgo: '2 hr ago',
     agency: 'PWD',
+    incidentType: 'road_blocked',
+    icon: Icons.block_outlined,
+    rejectionReason: 'Location and image do not show the reported fallen trees. Re-attend with a clear photo.',
   ),
   FieldReport(
     id: 'RPT-4440',
@@ -92,15 +139,16 @@ class ReportsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = AppLocalizations.of(context)!;
     final TextTheme text = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reports'),
+        title: Text(l10n.reports),
         actions: <Widget>[
           IconButton(
             iconSize: 28,
-            tooltip: 'Filter',
+            tooltip: l10n.filter,
             icon: const Icon(Icons.filter_list),
             // TODO(backend): filter by severity, status and agency once the
             // list comes from the API rather than a const list.
@@ -108,7 +156,7 @@ class ReportsScreen extends StatelessWidget {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
                 ..showSnackBar(
-                  const SnackBar(content: Text('Filters not wired yet')),
+                  SnackBar(content: Text(l10n.filtersNotWired)),
                 );
             },
           ),
@@ -124,7 +172,7 @@ class ReportsScreen extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
-                '${_sampleReports.length} REPORTS — SECTOR 4',
+                l10n.reportsCount(_sampleReports.length, 'SECTOR 4').toUpperCase(),
                 style: text.bodySmall?.copyWith(letterSpacing: 1.2),
               ),
             );
@@ -140,11 +188,11 @@ class ReportsScreen extends StatelessWidget {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(
-              const SnackBar(content: Text('Report composer not built yet')),
+              SnackBar(content: Text(l10n.reportComposerNotBuilt)),
             );
         },
         icon: const Icon(Icons.add),
-        label: const Text('New report'),
+        label: Text(l10n.newReport),
       ),
     );
   }
@@ -162,15 +210,7 @@ class _ReportTile extends StatelessWidget {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        // TODO(backend): open the report detail screen (timeline, attachments,
-        // verification actions).
-        onTap: () {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(content: Text('${report.id} — detail view not built')),
-            );
-        },
+        onTap: () => Navigator.of(context).push<void>(MaterialPageRoute<void>(builder: (_) => ReportDetailScreen(report: report))),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

@@ -1,1 +1,1 @@
-# ONE ROOF – Services Package
+"""ONE ROOF application services."""

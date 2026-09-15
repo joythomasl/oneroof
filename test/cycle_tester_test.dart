@@ -4,121 +4,74 @@
 // be RECORDED and the loop must CONTINUE. These tests pin that, plus the
 // stop-cleanly guarantee and the round-robin target selection that multi-node
 // runs will depend on.
+//
+// The tester drives a ConnectionManager over a fake client, so these exercise
+// the same hardened path the Mesh screen uses.
 
-import 'dart:async';
 
 import 'package:flutter_p2p_connection/flutter_p2p_connection.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oneroof/mesh/connection_manager.dart';
 import 'package:oneroof/mesh/cycle_tester.dart';
-import 'package:oneroof/mesh/mesh_message.dart';
 import 'package:oneroof/mesh/message_store.dart';
 import 'package:oneroof/mesh/sync_protocol.dart';
 
-BleDiscoveredDevice _device(String address) =>
-    BleDiscoveredDevice(deviceAddress: address, deviceName: 'host-$address');
+import 'fake_p2p_client.dart';
 
-/// A [FlutterP2pClient] with every platform-touching method replaced, so the
-/// loop can be driven without a radio.
-class _FakeClient extends FlutterP2pClient {
-  _FakeClient({this.discovered = const <BleDiscoveredDevice>[]});
+/// Sub-second policy so the loop runs at test speed.
+const ConnectionTuning _fast = ConnectionTuning(
+  scanTimeout: Duration(milliseconds: 30),
+  connectTimeout: Duration(milliseconds: 30),
+  cooldown: Duration(milliseconds: 10),
+  backoffBase: Duration(milliseconds: 2),
+  backoffCap: Duration(milliseconds: 20),
+  failureThreshold: 99, // breaker off unless a test asks for it
+  recoveryPause: Duration(milliseconds: 10),
+  scanWatchdog: Duration(milliseconds: 200),
+  connectWatchdog: Duration(milliseconds: 200),
+  disconnectWatchdog: Duration(milliseconds: 200),
+);
 
-  List<BleDiscoveredDevice> discovered;
-
-  int scanCalls = 0;
-  int connectCalls = 0;
-  int disconnectCalls = 0;
-  int broadcastCalls = 0;
-  final List<String> connectedTo = <String>[];
-
-  /// Cycle numbers (1-based) on which connect should throw.
-  Set<int> failConnectOnCall = <int>{};
-
-  /// Messages to drop into the store when a digest goes out, simulating a
-  /// peer answering with MSG frames.
-  MessageStore? storeToFeed;
-  int feedPerSync = 0;
-
-  Object connectError = TimeoutException('connect timed out');
-
-  @override
-  Future<StreamSubscription<List<BleDiscoveredDevice>>> startScan(
-    void Function(List<BleDiscoveredDevice>)? onData, {
-    Function? onError,
-    void Function()? onDone,
-    bool? cancelOnError,
-    Duration timeout = const Duration(seconds: 15),
-  }) async {
-    scanCalls++;
-    // Deliver asynchronously, the way the real scan does.
-    scheduleMicrotask(() {
-      onData?.call(discovered);
-      if (discovered.isEmpty) onDone?.call();
-    });
-    return const Stream<List<BleDiscoveredDevice>>.empty().listen((_) {});
-  }
-
-  @override
-  Future<void> stopScan() async {}
-
-  @override
-  Future<void> connectWithDevice(
-    BleDiscoveredDevice device, {
-    Duration timeout = const Duration(seconds: 20),
-  }) async {
-    connectCalls++;
-    if (failConnectOnCall.contains(connectCalls)) throw connectError;
-    connectedTo.add(device.deviceAddress);
-  }
-
-  @override
-  Future<void> disconnect() async => disconnectCalls++;
-
-  @override
-  Future<void> broadcastText(String text, {String? excludeClientId}) async {
-    broadcastCalls++;
-    final MessageStore? store = storeToFeed;
-    if (store == null) return;
-    for (int i = 0; i < feedPerSync; i++) {
-      store.add(MeshMessage.create(
-        type: MeshMessageType.statusUpdate.wireName,
-        originDevice: 'peer',
-        originUser: 'peer-user',
-      ));
-    }
-  }
+ConnectionManager _manager(
+  FakeP2pClient fake, {
+  ConnectionTuning tuning = _fast,
+}) {
+  return ConnectionManager(
+    username: 'test',
+    tuning: tuning,
+    clientFactory: () => fake,
+  );
 }
 
 CycleTester _tester(
-  _FakeClient client,
+  ConnectionManager connection,
   MessageStore store, {
   int? cycles = 3,
   List<BleDiscoveredDevice> targets = const <BleDiscoveredDevice>[],
-  Future<void> Function()? onConnected,
 }) {
   return CycleTester(
-    client: client,
+    connection: connection,
     store: store,
     protocol: const SyncProtocol(),
     targets: targets,
     cycleCount: cycles,
-    // Near-zero so the loop runs at test speed; the real values are operator
-    // tunable and carry no logic of their own.
-    scanTimeout: const Duration(milliseconds: 40),
-    connectTimeout: const Duration(milliseconds: 40),
     syncSettle: const Duration(milliseconds: 10),
     settleDelay: const Duration(milliseconds: 10),
-    onConnected: onConnected,
   );
 }
 
 void main() {
   group('CycleTester', () {
     test('runs the requested number of cycles and reports each one', () async {
-      final _FakeClient client = _FakeClient(discovered: <BleDiscoveredDevice>[
-        _device('AA'),
-      ]);
+      final FakeP2pClient fake = FakeP2pClient(
+        discovered: <BleDiscoveredDevice>[fakeDevice('AA')],
+      );
+      final ConnectionManager connection = _manager(fake);
+      addTearDown(connection.dispose);
+      await connection.initialize();
+
       final MessageStore store = MessageStore();
-      final CycleTester tester = _tester(client, store);
+      final CycleTester tester = _tester(connection, store);
       final List<CycleResult> seen = <CycleResult>[];
       tester.results.listen(seen.add);
 
@@ -128,17 +81,20 @@ void main() {
       expect(seen.length, 3);
       expect(seen.every((CycleResult r) => r.succeeded), isTrue);
       expect(seen.map((CycleResult r) => r.cycleNumber), <int>[1, 2, 3]);
-      expect(client.connectCalls, 3);
+      expect(fake.connectCalls, 3);
       await tester.dispose();
     });
 
     test('a failed connect is recorded and the loop continues', () async {
-      final _FakeClient client = _FakeClient(discovered: <BleDiscoveredDevice>[
-        _device('AA'),
-      ])
-        ..failConnectOnCall = <int>{2};
+      final FakeP2pClient fake = FakeP2pClient(
+        discovered: <BleDiscoveredDevice>[fakeDevice('AA')],
+      )..failConnectOnCall = <int>{2};
+      final ConnectionManager connection = _manager(fake);
+      addTearDown(connection.dispose);
+      await connection.initialize();
+
       final MessageStore store = MessageStore();
-      final CycleTester tester = _tester(client, store, cycles: 4);
+      final CycleTester tester = _tester(connection, store, cycles: 4);
       final List<CycleResult> seen = <CycleResult>[];
       tester.results.listen(seen.add);
 
@@ -150,7 +106,7 @@ void main() {
       expect(seen[1].succeeded, isFalse);
       expect(seen[1].connectSucceeded, isFalse);
       expect(seen[1].errorType, 'TimeoutException');
-      expect(seen[1].errorMessage, contains('connect timed out'));
+      expect(seen[1].errorMessage, contains('connect refused by peer'));
       // The cycles either side are unaffected.
       expect(seen[0].succeeded, isTrue);
       expect(seen[2].succeeded, isTrue);
@@ -159,9 +115,13 @@ void main() {
     });
 
     test('an empty scan is a recorded failure, not a crash', () async {
-      final _FakeClient client = _FakeClient();
+      final FakeP2pClient fake = FakeP2pClient();
+      final ConnectionManager connection = _manager(fake);
+      addTearDown(connection.dispose);
+      await connection.initialize();
+
       final MessageStore store = MessageStore();
-      final CycleTester tester = _tester(client, store, cycles: 2);
+      final CycleTester tester = _tester(connection, store, cycles: 2);
       final List<CycleResult> seen = <CycleResult>[];
       tester.results.listen(seen.add);
 
@@ -171,35 +131,46 @@ void main() {
       expect(seen.length, 2);
       expect(seen.every((CycleResult r) => r.scanSucceeded), isFalse);
       expect(seen.first.errorType, 'NoHostsFound');
-      expect(client.connectCalls, 0);
+      expect(fake.connectCalls, 0);
+      // Told the manager, so a deaf radio still counts toward the breaker.
+      expect(connection.consecutiveFailures, 2);
       await tester.dispose();
     });
 
     test('disconnects after every cycle, including failed ones', () async {
-      final _FakeClient client = _FakeClient(discovered: <BleDiscoveredDevice>[
-        _device('AA'),
-      ])
-        ..failConnectOnCall = <int>{1, 2, 3};
+      final FakeP2pClient fake = FakeP2pClient(
+        discovered: <BleDiscoveredDevice>[fakeDevice('AA')],
+      )..failConnectOnCall = <int>{1, 2, 3};
+      final ConnectionManager connection = _manager(fake);
+      addTearDown(connection.dispose);
+      await connection.initialize();
+
       final MessageStore store = MessageStore();
-      final CycleTester tester = _tester(client, store);
+      final CycleTester tester = _tester(connection, store);
 
       await tester.start();
 
-      // Once per cycle, plus the defensive disconnect at start and at finish.
-      expect(client.disconnectCalls, greaterThanOrEqualTo(3));
+      // Every failed cycle still releases the radio, and the run ends idle or
+      // cooling down — never attached.
+      expect(fake.disconnectCalls, greaterThanOrEqualTo(3));
+      expect(connection.isConnected, isFalse);
       await tester.dispose();
     });
 
     test('messagesGained reflects what actually arrived', () async {
-      final _FakeClient client = _FakeClient(discovered: <BleDiscoveredDevice>[
-        _device('AA'),
-      ]);
+      final FakeP2pClient fake = FakeP2pClient(
+        discovered: <BleDiscoveredDevice>[fakeDevice('AA')],
+      );
+      final ConnectionManager connection = _manager(fake);
+      addTearDown(connection.dispose);
+      await connection.initialize();
+
       final MessageStore store = MessageStore();
-      client
+      fake
         ..storeToFeed = store
         ..feedPerSync = 2;
 
-      final CycleTester tester = _tester(client, store);
+      final CycleTester tester = _tester(connection, store);
       final List<CycleResult> seen = <CycleResult>[];
       tester.results.listen(seen.add);
 
@@ -211,39 +182,20 @@ void main() {
       await tester.dispose();
     });
 
-    test('onConnected fires after each connect, before the digest', () async {
-      final _FakeClient client = _FakeClient(discovered: <BleDiscoveredDevice>[
-        _device('AA'),
-      ]);
-      final MessageStore store = MessageStore();
-      final List<int> broadcastsAtRebind = <int>[];
-
-      final CycleTester tester = _tester(
-        client,
-        store,
-        onConnected: () async => broadcastsAtRebind.add(client.broadcastCalls),
-      );
-
-      await tester.start();
-
-      // Called once per cycle, and each time no digest had gone out yet for
-      // that cycle — so the re-bound listener cannot miss the reply.
-      expect(broadcastsAtRebind, <int>[0, 1, 2]);
-      await tester.dispose();
-    });
-
     test('stop() halts the run and leaves the client disconnected', () async {
-      final _FakeClient client = _FakeClient(discovered: <BleDiscoveredDevice>[
-        _device('AA'),
-      ]);
+      final FakeP2pClient fake = FakeP2pClient(
+        discovered: <BleDiscoveredDevice>[fakeDevice('AA')],
+      );
+      final ConnectionManager connection = _manager(fake);
+      addTearDown(connection.dispose);
+      await connection.initialize();
+
       final MessageStore store = MessageStore();
       final CycleTester tester = CycleTester(
-        client: client,
+        connection: connection,
         store: store,
         protocol: const SyncProtocol(),
         cycleCount: null, // infinite
-        scanTimeout: const Duration(milliseconds: 20),
-        connectTimeout: const Duration(milliseconds: 20),
         syncSettle: const Duration(milliseconds: 10),
         settleDelay: const Duration(seconds: 30), // long, must be cut short
       );
@@ -264,39 +216,47 @@ void main() {
       expect(sw.elapsed, lessThan(const Duration(seconds: 5)));
       expect(tester.isRunning, isFalse);
       expect(seen, isNotEmpty);
-      expect(client.disconnectCalls, greaterThan(0));
+      expect(fake.disconnectCalls, greaterThan(0));
+      expect(connection.isConnected, isFalse);
       await tester.dispose();
     });
 
     test('targets are visited round-robin', () async {
-      final _FakeClient client = _FakeClient(discovered: <BleDiscoveredDevice>[
-        _device('AA'),
-        _device('BB'),
-      ]);
+      final FakeP2pClient fake = FakeP2pClient(
+        discovered: <BleDiscoveredDevice>[fakeDevice('AA'), fakeDevice('BB')],
+      );
+      final ConnectionManager connection = _manager(fake);
+      addTearDown(connection.dispose);
+      await connection.initialize();
+
       final MessageStore store = MessageStore();
       final CycleTester tester = _tester(
-        client,
+        connection,
         store,
         cycles: 4,
-        targets: <BleDiscoveredDevice>[_device('AA'), _device('BB')],
+        targets: <BleDiscoveredDevice>[fakeDevice('AA'), fakeDevice('BB')],
       );
 
       await tester.start();
 
-      expect(client.connectedTo, <String>['AA', 'BB', 'AA', 'BB']);
+      expect(fake.connectedTo, <String>['AA', 'BB', 'AA', 'BB']);
       await tester.dispose();
     });
 
     test('a target that is out of range is a recorded failure', () async {
-      final _FakeClient client = _FakeClient(discovered: <BleDiscoveredDevice>[
-        _device('AA'),
-      ]);
+      final FakeP2pClient fake = FakeP2pClient(
+        discovered: <BleDiscoveredDevice>[fakeDevice('AA')],
+      );
+      final ConnectionManager connection = _manager(fake);
+      addTearDown(connection.dispose);
+      await connection.initialize();
+
       final MessageStore store = MessageStore();
       final CycleTester tester = _tester(
-        client,
+        connection,
         store,
         cycles: 1,
-        targets: <BleDiscoveredDevice>[_device('ZZ')],
+        targets: <BleDiscoveredDevice>[fakeDevice('ZZ')],
       );
       final List<CycleResult> seen = <CycleResult>[];
       tester.results.listen(seen.add);
@@ -311,11 +271,13 @@ void main() {
     });
 
     test('selectTarget picks the freshly discovered instance', () {
-      final BleDiscoveredDevice stale = _device('AA');
-      final BleDiscoveredDevice fresh =
+      final BleDiscoveredDevice stale = fakeDevice('AA');
+      const BleDiscoveredDevice fresh =
           BleDiscoveredDevice(deviceAddress: 'AA', deviceName: 'renamed');
+      final ConnectionManager connection = _manager(FakeP2pClient());
+      addTearDown(connection.dispose);
       final CycleTester tester = CycleTester(
-        client: _FakeClient(),
+        connection: connection,
         store: MessageStore(),
         protocol: const SyncProtocol(),
         targets: <BleDiscoveredDevice>[stale],

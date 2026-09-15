@@ -33,6 +33,7 @@ class EventType(str, Enum):
     # Incident lifecycle - published by Person 5A's CRUD layer
     INCIDENT_CREATED = "incident_created"
     INCIDENT_UPDATED = "incident_updated"
+    AREA_UPDATED = "area_updated"
 
     # Verification - published by Person 5B's verification router
     INCIDENT_VERIFIED = "incident_verified"

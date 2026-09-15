@@ -59,7 +59,7 @@ class VerificationRecord:
 
     def __init__(
         self,
-        incident_id: UUID,
+        incident_id: int,
         status: VerificationStatus,
         verified_by: Optional[UUID] = None,
         reason: str = "",
@@ -71,6 +71,7 @@ class VerificationRecord:
         self.verified_at = datetime.now(timezone.utc)
         self.location_flagged: bool = False
         self.location_flag_reason: str = ""
+        self.location_distance_meters: Optional[float] = None
 
     def to_dict(self) -> dict:
         return {
@@ -81,19 +82,20 @@ class VerificationRecord:
             "reason": self.reason,
             "location_flagged": self.location_flagged,
             "location_flag_reason": self.location_flag_reason,
+            "location_distance_meters": self.location_distance_meters,
         }
 
 
 # Type aliases for the hooks Person 5A registers.
-LookupFn = Callable[[UUID], Awaitable[Optional[object]]]
-WriterFn = Callable[[UUID, str, Optional[UUID], str], Awaitable[None]]
+LookupFn = Callable[[int], Awaitable[Optional[object]]]
+WriterFn = Callable[[int, str, Optional[UUID], str], Awaitable[None]]
 
 
 class IncidentAdapter:
     """Bridge between verification decisions and Person 5A's incident store."""
 
     def __init__(self) -> None:
-        self._records: Dict[UUID, VerificationRecord] = {}
+        self._records: Dict[int, VerificationRecord] = {}
         self._lookup: Optional[LookupFn] = None
         self._writer: Optional[WriterFn] = None
 
@@ -124,7 +126,7 @@ class IncidentAdapter:
 
     # -- Existence --------------------------------------------
 
-    async def incident_exists(self, incident_id: UUID) -> Optional[bool]:
+    async def incident_exists(self, incident_id: int) -> Optional[bool]:
         """
         Does this incident exist?
 
@@ -142,11 +144,21 @@ class IncidentAdapter:
             logger.error("Incident lookup failed for %s: %s", incident_id, exc)
             return None
 
+    async def get_incident(self, incident_id: int) -> Optional[object]:
+        """Return the database incident when the Person 5 lookup is registered."""
+        if self._lookup is None:
+            return None
+        try:
+            return await self._lookup(incident_id)
+        except Exception as exc:
+            logger.error("Incident lookup failed for %s: %s", incident_id, exc)
+            return None
+
     # -- Decisions --------------------------------------------
 
     async def set_verification(
         self,
-        incident_id: UUID,
+        incident_id: int,
         status: VerificationStatus,
         verified_by: Optional[UUID] = None,
         reason: str = "",
@@ -163,6 +175,7 @@ class IncidentAdapter:
         if previous is not None:
             record.location_flagged = previous.location_flagged
             record.location_flag_reason = previous.location_flag_reason
+            record.location_distance_meters = previous.location_distance_meters
         self._records[incident_id] = record
 
         persisted = False
@@ -188,9 +201,10 @@ class IncidentAdapter:
 
     async def flag_location(
         self,
-        incident_id: UUID,
+        incident_id: int,
         reason: str,
         flagged_by: Optional[UUID] = None,
+        distance_meters: Optional[float] = None,
     ) -> VerificationRecord:
         """
         Mark a possible location mismatch.
@@ -207,12 +221,13 @@ class IncidentAdapter:
             self._records[incident_id] = record
         record.location_flagged = True
         record.location_flag_reason = reason
+        record.location_distance_meters = distance_meters
         logger.info("Incident %s location flagged: %s", incident_id, reason)
         return record
 
     # -- Reads ------------------------------------------------
 
-    async def get_verification(self, incident_id: UUID) -> Optional[VerificationRecord]:
+    async def get_verification(self, incident_id: int) -> Optional[VerificationRecord]:
         return self._records.get(incident_id)
 
     async def list_verifications(self) -> List[dict]:
