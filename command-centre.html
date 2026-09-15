@@ -1,0 +1,2729 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UNIRES — State Command Centre</title>
+<style>
+/* ============================================================
+   UNIRES · Command Centre
+   ------------------------------------------------------------
+   THEMING CONTRACT
+   Every colour on this page comes from a token below. Nothing
+   downstream declares a literal colour except the synthetic
+   photo scenes in sceneSVG(), which are imagery, not chrome.
+
+   Three viewer states are handled (this build defaults to LIGHT; the
+   bootstrap stamps data-theme="light" unless the viewer stored otherwise):
+     :root                                  -> dark (applies only under 'system' on a dark OS)
+     @media (prefers-color-scheme: light)   -> light, unless the user forced dark
+     :root[data-theme="light"|"dark"]       -> explicit user override, wins both ways
+
+   Contrast is verified, not assumed: 106/106 token pairs meet
+   WCAG 2.1 AA (text 4.5:1, UI borders and focus rings 3:1) in
+   both themes. Severity fills are deliberately IDENTICAL across
+   themes — a P0 is the same red everywhere — so the theme only
+   shifts the "-fg" variants used for text on the page ground.
+   ============================================================ */
+:root{
+  color-scheme: dark;
+
+  /* ground + surfaces */
+  --bg:#070B11;
+  --surface:#0E1620;
+  --surface-2:#14202D;        /* elevated: inputs, chips, tiles */
+  --surface-3:#1B2937;        /* hover / pressed */
+  --scrim:rgba(3,7,12,.72);
+
+  /* lines: --line/--line-2 are decorative dividers, --control is a
+     functional control edge and is held to 3:1 */
+  --line:#1F2C3A;
+  --line-2:#2C3E52;
+  --control:#5B7288;
+  --control-hover:#7B94AC;
+  --focus:#4DA3FF;
+
+  /* text */
+  --text:#E8EFF7;
+  --text-2:#9BADC1;
+  --text-3:#8296AC;
+  --text-disabled:#6B8098;
+
+  /* accents — exactly two beyond the severity scale */
+  --primary:#4DA3FF;
+  --primary-hover:#6DB4FF;
+  --on-primary:#04121F;
+  --primary-fg:#4DA3FF;
+  --primary-wash:rgba(77,163,255,.11);
+  --primary-edge:rgba(77,163,255,.45);
+
+  --accent-2:#9B7BFF;          /* agency / unit identity */
+  --accent-2-fg:#C3AEFF;
+  --on-accent-2:#160B2E;
+  --accent-2-wash:rgba(155,123,255,.13);
+  --accent-2-edge:rgba(155,123,255,.36);
+
+  /* severity — fill + ink on fill + foreground-on-ground */
+  --p0:#FF3B41; --p1:#FF8A2B; --p2:#F5C518; --p3:#35C77B;
+  --sev-ink:#08101A;
+  --p0-fg:#FF6B70; --p1-fg:#FF9F4D; --p2-fg:#F5C518; --p3-fg:#4FD98F;
+  --p0-wash:rgba(255,59,65,.10); --p0-edge:rgba(255,59,65,.38);
+  --p1-wash:rgba(255,138,43,.10); --p1-edge:rgba(255,138,43,.40);
+  --p3-wash:rgba(53,199,123,.10); --p3-edge:rgba(53,199,123,.34);
+
+  /* issue-state palette */
+  --st-open:#8FA6BE;
+  --st-triaged:#F5C518;
+  --st-assigned:#4DA3FF;
+  --st-progress:#9B7BFF;
+  --st-resolved:#35C77B;
+  --st-escalated:#FF3B41;
+  --st-rejected:#FF8A2B;
+
+  /* map */
+  --map-water:#050910;
+  --map-grid:#0E1620;
+  --map-em:#3A1218;   --map-em-stroke:#FF5A5F;
+  --map-al:#33220F;   --map-al-stroke:#FFA24D;
+  --map-no:#0C1A16;   --map-no-stroke:#52687D;
+  --map-label:#C6D6E6;
+  --map-label-dim:#6E8298;
+  --map-label-halo:#070B11;
+  --map-glow:#FF3B41;
+  --map-glow-opacity:.10;
+  --marker-edge:rgba(4,10,16,.6);
+  --marker-ring:rgba(226,236,247,.72);
+  --marker-ring-strong:#FFFFFF;
+  --unit-fill:#131F2C;
+  --unit-text:#CDBBFF;
+  --dim-opacity:.22;
+
+  /* feedback surfaces */
+  --toast-bg:#1B2937;
+  --toast-text:#E8EFF7;
+  --skeleton:#1A2632;
+  --skeleton-sheen:rgba(155,178,201,.14);
+  --shadow-lg:0 20px 50px rgba(0,0,0,.6);
+  --shadow-xl:0 30px 90px rgba(0,0,0,.7);
+
+  /* type + metrics */
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Consolas,"Liberation Mono",monospace;
+  --panel-w:400px;
+  --r:6px;
+  --tap:44px;                  /* minimum touch target */
+}
+
+/* ---- LIGHT: OS preference, unless the user has forced dark ---- */
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg:#EEF2F7;
+    --surface:#FFFFFF;
+    --surface-2:#F3F6FA;
+    --surface-3:#E6ECF4;
+    --scrim:rgba(16,26,38,.44);
+
+    --line:#DCE3EC;
+    --line-2:#C6D2DF;
+    --control:#78899C;
+    --control-hover:#5A6C80;
+    --focus:#0A5FC4;
+
+    --text:#0D1620;
+    --text-2:#46586C;
+    --text-3:#5C6E83;
+    --text-disabled:#737F90;
+
+    --primary:#0A5FC4;
+    --primary-hover:#084FA6;
+    --on-primary:#FFFFFF;
+    --primary-fg:#0A5FC4;
+    --primary-wash:rgba(10,95,196,.09);
+    --primary-edge:rgba(10,95,196,.38);
+
+    --accent-2:#5333C4;
+    --accent-2-fg:#4B2DB4;
+    --on-accent-2:#FFFFFF;
+    --accent-2-wash:rgba(83,51,196,.08);
+    --accent-2-edge:rgba(83,51,196,.30);
+
+    --p0-fg:#B3161C; --p1-fg:#8A4B00; --p2-fg:#775800; --p3-fg:#0A6E45;
+    --p0-wash:rgba(255,59,65,.11); --p0-edge:rgba(179,22,28,.34);
+    --p1-wash:rgba(255,138,43,.14); --p1-edge:rgba(138,75,0,.32);
+    --p3-wash:rgba(53,199,123,.14); --p3-edge:rgba(10,110,69,.30);
+
+    --st-open:#5C6E83;
+    --st-triaged:#775800;
+    --st-assigned:#0A5FC4;
+    --st-progress:#4B2DB4;
+    --st-resolved:#0A6E45;
+    --st-escalated:#B3161C;
+    --st-rejected:#8A4B00;
+
+    --map-water:#DCE6F0;
+    --map-grid:#E7EDF4;
+    --map-em:#FBD9DA;   --map-em-stroke:#C3161D;
+    --map-al:#FBE7CE;   --map-al-stroke:#B35F00;
+    --map-no:#E9F2EC;   --map-no-stroke:#70819A;
+    --map-label:#1B2B3C;
+    --map-label-dim:#5C6E83;
+    --map-label-halo:#FFFFFF;
+    --map-glow:#FF3B41;
+    --map-glow-opacity:.06;
+    --marker-edge:rgba(12,20,30,.55);
+    --marker-ring:rgba(28,44,62,.62);
+    --marker-ring-strong:#0D1620;
+    --unit-fill:#FFFFFF;
+    --unit-text:#4B2DB4;
+    --dim-opacity:.3;
+
+    --toast-bg:#152233;
+    --toast-text:#F2F6FB;
+    --skeleton:#E4EAF2;
+    --skeleton-sheen:rgba(255,255,255,.75);
+    --shadow-lg:0 18px 40px rgba(19,36,56,.16);
+    --shadow-xl:0 28px 70px rgba(19,36,56,.22);
+  }
+}
+
+/* ---- explicit override: light, whatever the OS says ---- */
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#EEF2F7;
+  --surface:#FFFFFF;
+  --surface-2:#F3F6FA;
+  --surface-3:#E6ECF4;
+  --scrim:rgba(16,26,38,.44);
+  --line:#DCE3EC;
+  --line-2:#C6D2DF;
+  --control:#78899C;
+  --control-hover:#5A6C80;
+  --focus:#0A5FC4;
+  --text:#0D1620;
+  --text-2:#46586C;
+  --text-3:#5C6E83;
+  --text-disabled:#737F90;
+  --primary:#0A5FC4;
+  --primary-hover:#084FA6;
+  --on-primary:#FFFFFF;
+  --primary-fg:#0A5FC4;
+  --primary-wash:rgba(10,95,196,.09);
+  --primary-edge:rgba(10,95,196,.38);
+  --accent-2:#5333C4;
+  --accent-2-fg:#4B2DB4;
+  --on-accent-2:#FFFFFF;
+  --accent-2-wash:rgba(83,51,196,.08);
+  --accent-2-edge:rgba(83,51,196,.30);
+  --p0-fg:#B3161C; --p1-fg:#8A4B00; --p2-fg:#775800; --p3-fg:#0A6E45;
+  --p0-wash:rgba(255,59,65,.11); --p0-edge:rgba(179,22,28,.34);
+  --p1-wash:rgba(255,138,43,.14); --p1-edge:rgba(138,75,0,.32);
+  --p3-wash:rgba(53,199,123,.14); --p3-edge:rgba(10,110,69,.30);
+  --st-open:#5C6E83; --st-triaged:#775800; --st-assigned:#0A5FC4;
+  --st-progress:#4B2DB4; --st-resolved:#0A6E45; --st-escalated:#B3161C; --st-rejected:#8A4B00;
+  --map-water:#DCE6F0;
+  --map-grid:#E7EDF4;
+  --map-em:#FBD9DA;   --map-em-stroke:#C3161D;
+  --map-al:#FBE7CE;   --map-al-stroke:#B35F00;
+  --map-no:#E9F2EC;   --map-no-stroke:#70819A;
+  --map-label:#1B2B3C;
+  --map-label-dim:#5C6E83;
+  --map-label-halo:#FFFFFF;
+  --map-glow-opacity:.06;
+  --marker-edge:rgba(12,20,30,.55);
+  --marker-ring:rgba(28,44,62,.62);
+  --marker-ring-strong:#0D1620;
+  --unit-fill:#FFFFFF;
+  --unit-text:#4B2DB4;
+  --dim-opacity:.3;
+  --toast-bg:#152233;
+  --toast-text:#F2F6FB;
+  --skeleton:#E4EAF2;
+  --skeleton-sheen:rgba(255,255,255,.75);
+  --shadow-lg:0 18px 40px rgba(19,36,56,.16);
+  --shadow-xl:0 28px 70px rgba(19,36,56,.22);
+}
+
+/* ---- explicit override: dark, whatever the OS says ---- */
+:root[data-theme="dark"]{ color-scheme: dark; }
+
+/* ============================================================
+   BASE
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font:13px/1.45 var(--sans);
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+button{font-family:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.hidden{display:none !important}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.lbl{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);font-weight:600}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line-2);border:3px solid var(--surface);border-radius:6px}
+::-webkit-scrollbar-thumb:hover{background:var(--control)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes ping{0%{r:11;opacity:.55}70%{r:26;opacity:0}100%{r:26;opacity:0}}
+@keyframes sheen{0%{background-position:-220px 0}100%{background-position:220px 0}}
+
+.app{height:100vh;display:grid;grid-template-rows:54px 66px minmax(0,1fr)}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;background:var(--surface);border-bottom:1px solid var(--line);
+  position:relative;z-index:60;
+}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.brand .mark{width:28px;height:28px;flex:none}
+.brand .mark path{stroke:var(--primary-fg)}
+.brand .mark circle{stroke:var(--primary-fg)}
+.brand-txt{display:flex;flex-direction:column;line-height:1.15}
+.brand-name{font-size:15px;font-weight:750;letter-spacing:.16em}
+.brand-sub{font-size:10.5px;color:var(--text-3);letter-spacing:.03em}
+.hdr-mid{display:flex;align-items:center;gap:10px}
+.env-pill{
+  display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:999px;
+  background:var(--p0-wash);border:1px solid var(--p0-edge);
+  font-size:11px;font-weight:700;letter-spacing:.09em;color:var(--p0-fg);
+}
+.env-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--p0);animation:blink 2s infinite}
+.hdr-right{display:flex;align-items:center;gap:6px}
+.linkbtn{
+  background:none;border:0;color:var(--text-2);font-size:12px;padding:9px;border-radius:var(--r);cursor:pointer;
+  min-height:var(--tap);display:inline-flex;align-items:center;
+}
+.linkbtn:hover{background:var(--surface-2);color:var(--text)}
+.acct-btn{
+  display:flex;align-items:center;gap:9px;background:var(--surface-2);border:1px solid var(--control);
+  padding:5px 10px 5px 5px;border-radius:999px;cursor:pointer;color:var(--text);min-height:38px;
+}
+.acct-btn:hover{border-color:var(--control-hover);background:var(--surface-3)}
+.avatar{
+  width:28px;height:28px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--primary);color:var(--on-primary);font-weight:800;font-size:11px;
+}
+.acct-meta{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}
+.acct-name{font-size:12px;font-weight:650}
+.acct-role{font-size:10px;color:var(--text-3)}
+.caret{width:9px;height:9px;stroke:var(--text-3);fill:none;stroke-width:2}
+
+.menu{
+  position:absolute;top:50px;right:14px;width:286px;background:var(--surface);
+  border:1px solid var(--line-2);border-radius:9px;padding:6px;z-index:80;box-shadow:var(--shadow-lg);
+}
+.menu-head{padding:11px 11px 12px;border-bottom:1px solid var(--line);margin-bottom:6px;display:flex;gap:11px;align-items:center}
+.menu-head .avatar{width:36px;height:36px;font-size:13px}
+.menu-head b{display:block;font-size:13px}
+.menu-head span{display:block;font-size:11px;color:var(--text-3)}
+.menu-item{
+  display:flex;width:100%;align-items:center;gap:10px;padding:0 11px;min-height:var(--tap);border-radius:var(--r);
+  background:none;border:0;color:var(--text-2);font-size:12.5px;cursor:pointer;text-align:left;
+}
+.menu-item:hover{background:var(--surface-3);color:var(--text)}
+.menu-item .k{margin-left:auto;font-size:10px;color:var(--text-3);font-family:var(--mono)}
+.menu-sep{height:1px;background:var(--line);margin:6px 0}
+.menu-demo{padding:8px 11px 10px}
+.menu-demo .lbl{margin-bottom:7px}
+.seg{display:flex;gap:4px}
+.seg button{
+  flex:1;padding:0 4px;min-height:34px;font-size:11px;font-weight:650;border-radius:5px;cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--control);color:var(--text-2);
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+}
+.seg button:hover{border-color:var(--control-hover);color:var(--text)}
+.seg button[aria-pressed="true"],.seg button.on{background:var(--primary-wash);border-color:var(--primary);color:var(--primary-fg)}
+.seg button svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ============================================================
+   STATUS STRIP
+   ============================================================ */
+.strip{
+  display:flex;align-items:center;padding:0 16px;
+  background:var(--surface);border-bottom:1px solid var(--line);position:relative;z-index:50;
+}
+.vsep{width:1px;height:38px;background:var(--line);margin:0 16px;flex:none}
+.clock{display:flex;flex-direction:column;gap:2px;min-width:148px}
+.clk-time{font-size:20px;font-weight:600;line-height:1}
+.clk-time .tz{font-size:10px;color:var(--text-3);font-weight:600;letter-spacing:.08em;margin-left:3px}
+.clk-date{font-size:11px;color:var(--text-2)}
+.elapsed{display:flex;flex-direction:column;gap:5px;min-width:300px}
+.elapsed-row{display:flex;align-items:baseline;gap:10px}
+#elapsedVal{font-size:24px;font-weight:700;line-height:1;transition:color .5s ease}
+.elapsed .sub{font-size:10.5px;color:var(--text-3)}
+.t-green{color:var(--p3-fg)} .t-amber{color:var(--p1-fg)} .t-red{color:var(--p0-fg)}
+.counter{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;cursor:pointer;
+  background:var(--p0-wash);border:1px solid var(--p0-edge);color:var(--p0-fg);font-size:11px;font-weight:700;
+}
+.counter:hover{background:var(--surface-3)}
+.counter .dot{width:5px;height:5px;border-radius:50%;background:var(--p0)}
+.track{height:3px;border-radius:2px;background:var(--surface-3);position:relative;overflow:hidden;width:300px}
+.track i{position:absolute;top:0;bottom:0;left:0;border-radius:2px;transition:width .6s ease,background .6s ease}
+.track b{position:absolute;top:-2px;bottom:-2px;width:1px;background:var(--control)}
+.stats{display:flex;align-items:center;gap:24px;margin-left:auto}
+.stat{display:flex;flex-direction:column;gap:6px}
+.stat .val{font-size:15px;font-weight:700;line-height:1}
+.sevrow{display:flex;gap:9px;align-items:center}
+.sevcount{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;font-family:var(--mono)}
+.sevcount i{width:8px;height:8px;border-radius:2px;display:block}
+.stat .sml{font-size:10.5px;color:var(--text-3)}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--p3);display:inline-block;margin-right:5px;animation:blink 2.4s infinite}
+.fg-s0{color:var(--p0-fg)} .fg-s1{color:var(--p1-fg)} .fg-s2{color:var(--p2-fg)} .fg-s3{color:var(--p3-fg)}
+.bg-s0{background:var(--p0)} .bg-s1{background:var(--p1)} .bg-s2{background:var(--p2)} .bg-s3{background:var(--p3)}
+
+.pop{
+  position:absolute;top:60px;left:268px;width:296px;z-index:70;
+  background:var(--surface);border:1px solid var(--line-2);border-radius:9px;padding:7px;box-shadow:var(--shadow-lg);
+}
+.pop h4{margin:5px 8px 8px;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-3)}
+.pop button{
+  display:flex;width:100%;align-items:center;gap:10px;padding:8px 9px;min-height:var(--tap);border-radius:var(--r);
+  background:none;border:0;color:var(--text);cursor:pointer;text-align:left;font-size:12.5px;
+}
+.pop button:hover{background:var(--surface-3)}
+.pop button .sq{width:8px;height:8px;border-radius:2px;background:var(--p0);flex:none}
+.pop .t{margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:700}
+
+/* ============================================================
+   MAIN / MAP
+   ============================================================ */
+.main{display:grid;grid-template-columns:minmax(0,1fr) var(--panel-w);min-height:0}
+.main.collapsed{--panel-w:46px}
+.mapwrap{position:relative;min-width:0;background:var(--map-water);overflow:hidden}
+#map{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#map.dragging{cursor:grabbing}
+.map-water{fill:var(--map-water)}
+.map-grid{stroke:var(--map-grid);fill:none}
+.glow-em{fill:var(--map-glow);opacity:var(--map-glow-opacity)}
+
+.district{cursor:pointer;stroke-width:1.2;stroke-linejoin:round;transition:filter .18s ease}
+.district:hover{filter:brightness(1.14) saturate(1.1)}
+.d-EMERGENCY{fill:var(--map-em);stroke:var(--map-em-stroke)}
+.d-ALERT{fill:var(--map-al);stroke:var(--map-al-stroke)}
+.d-NORMAL{fill:var(--map-no);stroke:var(--map-no-stroke)}
+.district.sel{stroke:var(--focus);stroke-width:2.6}
+.dlabel{
+  pointer-events:none;font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.11em;
+  fill:var(--map-label);paint-order:stroke;stroke:var(--map-label-halo);stroke-width:3.5px;stroke-linejoin:round;
+}
+.dlabel.dim{fill:var(--map-label-dim)}
+.dsub{
+  pointer-events:none;font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;fill:var(--map-label-dim);
+  paint-order:stroke;stroke:var(--map-label-halo);stroke-width:3px;stroke-linejoin:round;
+}
+.dsub.em{fill:var(--p0-fg)} .dsub.al{fill:var(--p1-fg)}
+.marker{cursor:pointer}
+.marker.dim{opacity:var(--dim-opacity)}
+.marker .hit{fill:transparent}
+.mk-dot{stroke:var(--marker-edge);stroke-width:1}
+.mk-dot.s0{fill:var(--p0)} .mk-dot.s1{fill:var(--p1)} .mk-dot.s2{fill:var(--p2)} .mk-dot.s3{fill:var(--p3)}
+.glyph{fill:none;stroke:var(--sev-ink);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+.ring{fill:none;stroke:var(--marker-ring);stroke-width:1.6}
+.ring.strong{stroke:var(--marker-ring-strong)}
+.sel-ring{fill:none;stroke:var(--focus);stroke-width:2.4}
+.ping{animation:ping 1.9s cubic-bezier(0,.5,.5,1) infinite;fill:none;stroke:var(--p0);stroke-width:2}
+.ping.flash{stroke:var(--marker-ring-strong)}
+.count-bub{fill:var(--surface);stroke:var(--line-2);stroke-width:1}
+.count-txt{font-family:var(--mono);font-size:8.5px;font-weight:700;fill:var(--text-2)}
+.unit-body,.unit-tip{fill:var(--unit-fill);stroke:var(--accent-2);stroke-width:1.4}
+.unit-txt{font-family:var(--mono);font-size:8.5px;font-weight:700;fill:var(--unit-text);letter-spacing:.04em}
+.unit-dot{stroke:var(--surface);stroke-width:1.2}
+.unit-dot.engaged{fill:var(--accent-2)}
+.unit-dot.enroute{fill:var(--p2)}
+.unit-dot.avail{fill:var(--text-3)}
+
+/* map overlays */
+.ov{position:absolute;z-index:20}
+.mapctl{top:12px;right:12px;display:flex;flex-direction:column;gap:1px;background:var(--line-2);border:1px solid var(--line-2);border-radius:7px;overflow:hidden}
+.mapctl button{
+  width:var(--tap);height:38px;background:var(--surface);border:0;color:var(--text-2);cursor:pointer;display:grid;place-items:center;
+}
+.mapctl button:hover{background:var(--surface-3);color:var(--text)}
+.mapctl button svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round}
+.legend{
+  left:12px;bottom:12px;background:var(--surface);border:1px solid var(--line-2);border-radius:8px;
+  padding:11px 13px;min-width:212px;box-shadow:var(--shadow-lg);
+}
+.legend .lbl{margin-bottom:8px}
+.legend .grp+.grp{margin-top:11px;padding-top:10px;border-top:1px solid var(--line)}
+.lgd{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-2);padding:2.5px 0}
+.lgd .sw{width:11px;height:11px;border-radius:50%;flex:none;border:1px solid var(--marker-edge)}
+.lgd .sq{width:11px;height:11px;border-radius:2px;flex:none}
+.lgd .rng{width:13px;height:13px;border-radius:50%;border:1.6px solid var(--text-2);flex:none}
+.lgd b{color:var(--text);font-weight:650;font-family:var(--mono);font-size:11px}
+.coords{
+  right:12px;bottom:12px;font-family:var(--mono);font-size:10px;color:var(--text-2);
+  background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 9px;
+}
+
+/* district action card */
+.dcard{
+  left:12px;top:12px;width:318px;background:var(--surface);border:1px solid var(--line-2);
+  border-radius:10px;box-shadow:var(--shadow-lg);overflow:hidden;
+}
+.dcard-hd{padding:13px 14px 12px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
+.dcard-hd h3{margin:0;font-size:16px;font-weight:700}
+.dcard-hd p{margin:3px 0 0;font-size:11px;color:var(--text-3)}
+.state-pill{padding:4px 8px;border-radius:5px;font-size:9.5px;font-weight:800;letter-spacing:.1em;white-space:nowrap;flex:none}
+.dstate-EMERGENCY{background:var(--p0-wash);color:var(--p0-fg);border:1px solid var(--p0-edge)}
+.dstate-ALERT{background:var(--p1-wash);color:var(--p1-fg);border:1px solid var(--p1-edge)}
+.dstate-NORMAL{background:var(--p3-wash);color:var(--p3-fg);border:1px solid var(--p3-edge)}
+.dcard-close{
+  position:absolute;top:6px;right:6px;background:none;border:0;color:var(--text-3);font-size:17px;cursor:pointer;
+  line-height:1;width:34px;height:34px;border-radius:4px;
+}
+.dcard-close:hover{background:var(--surface-3);color:var(--text)}
+.dcard-body{padding:12px 14px 13px}
+.dstats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:11px}
+.dstat{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:7px 6px;text-align:center}
+.dstat .n{font-family:var(--mono);font-size:16px;font-weight:700;line-height:1.1;color:var(--text-disabled)}
+.dstat .l{font-size:8.5px;letter-spacing:.09em;color:var(--text-3);font-weight:700;margin-top:3px}
+.dmeta{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.dmeta div{display:flex;gap:8px;font-size:11.5px;color:var(--text-2);align-items:baseline}
+.dmeta div > span:first-child{color:var(--text-3);min-width:78px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:650}
+.dmeta b{color:var(--text);font-weight:600}
+.dcard-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* buttons */
+.btn{
+  appearance:none;border:1px solid var(--control);background:var(--surface-2);color:var(--text);
+  padding:9px 12px;min-height:38px;border-radius:var(--r);font-size:12px;font-weight:650;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1.2;white-space:nowrap;
+}
+.btn:hover{background:var(--surface-3);border-color:var(--control-hover)}
+.btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn.primary:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+.btn.sm{padding:6px 9px;min-height:32px;font-size:11px}
+.btn.wide{width:100%}
+.btn[disabled],.btn[aria-disabled="true"]{
+  opacity:1;background:var(--surface-2);border-color:var(--line-2);color:var(--text-disabled);cursor:not-allowed;
+}
+.btn[disabled]:hover{background:var(--surface-2);border-color:var(--line-2)}
+
+.btn.contact{min-height:var(--tap)}
+.acts .btn.contact{flex:1 1 100%}
+/* incident callout */
+.callout{
+  width:252px;background:var(--surface);border:1px solid var(--control);border-radius:9px;
+  box-shadow:var(--shadow-lg);padding:11px 12px;
+}
+.callout .top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.callout .id{font-family:var(--mono);font-size:10.5px;color:var(--text-3);margin-left:auto}
+.callout h4{margin:0 0 7px;font-size:12.5px;font-weight:650;line-height:1.35}
+.callout .kv{display:flex;justify-content:space-between;font-size:11px;color:var(--text-2);padding:2px 0;gap:10px}
+.callout .kv b{color:var(--text);font-weight:600;text-align:right}
+
+/* ============================================================
+   SIDE PANEL — issue list
+   ============================================================ */
+.panel{background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;position:relative}
+.main.collapsed .panel-inner{display:none}
+.panel-rail{display:none}
+.main.collapsed .panel-rail{display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:8px;height:100%}
+.rail-txt{writing-mode:vertical-rl;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-3);font-weight:700}
+.rail-count{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--p0-fg)}
+.panel-inner{display:flex;flex-direction:column;min-height:0;height:100%}
+.panel-hd{padding:8px 8px 8px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px}
+.panel-hd h2{margin:0;font-size:13px;font-weight:700;letter-spacing:.03em}
+.panel-hd .cnt{font-family:var(--mono);font-size:11px;color:var(--text-3);margin-left:auto}
+.icon-btn{
+  background:none;border:1px solid transparent;color:var(--text-3);cursor:pointer;border-radius:5px;
+  width:var(--tap);height:38px;display:grid;place-items:center;
+}
+.icon-btn:hover{background:var(--surface-2);color:var(--text)}
+.icon-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.filters{padding:11px 14px 12px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.frow{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.frow:last-child{margin-bottom:0}
+.chip{
+  flex:1;min-height:34px;border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:700;
+  background:var(--surface);border:1px solid var(--control);color:var(--text-3);
+  display:flex;align-items:center;justify-content:center;gap:5px;
+}
+.chip i{width:8px;height:8px;border-radius:2px;display:block;opacity:.4}
+.chip[aria-pressed="true"]{color:var(--text);border-color:var(--control-hover);background:var(--surface-3)}
+.chip[aria-pressed="true"] i{opacity:1}
+select{
+  flex:1;min-width:0;min-height:34px;background:var(--surface);border:1px solid var(--control);color:var(--text-2);
+  border-radius:5px;padding:6px 7px;font-size:11.5px;font-family:inherit;cursor:pointer;
+}
+select:hover{border-color:var(--control-hover)}
+.dfilter{
+  display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:5px;font-size:11.5px;
+  background:var(--primary-wash);border:1px solid var(--primary-edge);color:var(--primary-fg);width:100%;
+}
+.dfilter b{font-weight:700}
+.dfilter button{margin-left:auto;background:none;border:0;color:inherit;cursor:pointer;font-size:16px;line-height:1;width:30px;height:30px;border-radius:4px}
+.dfilter button:hover{background:var(--surface-3)}
+.sortnote{font-size:10px;color:var(--text-3);padding:7px 14px 0}
+
+.list{overflow-y:auto;flex:1;min-height:0;padding:6px 8px 16px}
+.row{
+  display:grid;grid-template-columns:30px 20px minmax(0,1fr) auto;gap:9px;align-items:center;
+  padding:9px 8px;min-height:var(--tap);border-radius:7px;cursor:pointer;border:1px solid transparent;position:relative;
+}
+.row:hover{background:var(--surface-2)}
+.row.sel{background:var(--primary-wash);border-color:var(--primary-edge)}
+.row.sel::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:var(--primary)}
+.sev{font-family:var(--mono);font-size:10.5px;font-weight:800;text-align:center;padding:3px 0;border-radius:4px;color:var(--sev-ink)}
+.sev0{background:var(--p0)} .sev1{background:var(--p1)} .sev2{background:var(--p2)} .sev3{background:var(--p3)}
+.row .tico{width:20px;height:20px;display:grid;place-items:center}
+.row .tico svg{width:17px;height:17px;fill:none;stroke:var(--text-2);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.row.sel .tico svg{stroke:var(--text)}
+.rtitle{display:block;font-size:12.2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.rmeta{display:flex;font-size:10.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;margin-top:2px;align-items:center;gap:5px}
+.rmeta .age{font-family:var(--mono)}
+.rmeta .age.over{color:var(--p1-fg);font-weight:700}
+.rmeta .sep{opacity:.45}
+.stat-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
+.s-open{color:var(--st-open)} .s-triaged{color:var(--st-triaged)} .s-assigned{color:var(--st-assigned)}
+.s-progress{color:var(--st-progress)} .s-resolved{color:var(--st-resolved)}
+.s-escalated{color:var(--st-escalated)} .s-rejected{color:var(--st-rejected)}
+
+/* agency indicator — lead + overflow, never a wrapped wall of chips */
+.agy-cell{display:flex;align-items:center;gap:4px;flex:none}
+.agy{
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.03em;padding:3px 6px;border-radius:4px;
+  background:var(--accent-2-wash);border:1px solid var(--accent-2-edge);color:var(--accent-2-fg);white-space:nowrap;
+}
+.agy.lead{border-color:var(--accent-2);font-weight:800}
+.agy.more{background:var(--surface-2);border-color:var(--line-2);color:var(--text-2);padding:3px 5px}
+.agy.none{background:transparent;border-style:dashed;border-color:var(--line-2);color:var(--text-3)}
+
+/* ============================================================
+   ISSUE DETAIL (expanded row)
+   ============================================================ */
+.detail{margin:0 8px 8px;padding:11px 12px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line-2)}
+.detail .kv{display:flex;justify-content:space-between;gap:10px;font-size:11px;padding:3px 0;color:var(--text-2)}
+.detail .kv b{color:var(--text);font-weight:600;font-family:var(--mono);font-size:11px;text-align:right}
+.detail .acts{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.src{font-size:9.5px;font-weight:700;letter-spacing:.06em;padding:2px 6px;border-radius:4px;border:1px solid var(--line-2);color:var(--text-3)}
+.src.civ{border-color:var(--p1-edge);color:var(--p1-fg);background:var(--p1-wash)}
+.empty{padding:34px 20px;text-align:center;color:var(--text-3);font-size:12px;line-height:1.6}
+
+.sec{margin-top:12px;padding-top:11px;border-top:1px solid var(--line-2)}
+.sec-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.sec-hd .lbl{margin:0}
+.sec-hd .tag{
+  margin-left:auto;font-size:9px;font-weight:700;letter-spacing:.08em;padding:2px 6px;border-radius:4px;
+  background:var(--surface-3);color:var(--text-3);border:1px solid var(--line-2);
+}
+
+/* assigned agencies, full list with role */
+.assign{display:flex;flex-direction:column;gap:6px}
+.assign-row{display:flex;align-items:center;gap:8px;font-size:11.5px}
+.assign-row .role{
+  margin-left:auto;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 6px;border-radius:4px;border:1px solid var(--line-2);color:var(--text-3);
+}
+.assign-row .role.lead{border-color:var(--accent-2-edge);color:var(--accent-2-fg);background:var(--accent-2-wash)}
+.assign-row .when{font-size:10px;color:var(--text-3);font-family:var(--mono)}
+
+/* CPOC block */
+.cpoc-b{display:flex;flex-direction:column;gap:9px}
+.cpoc-id{display:flex;gap:10px;align-items:flex-start}
+.cpoc-mono{
+  width:34px;height:34px;border-radius:8px;flex:none;display:grid;place-items:center;
+  background:var(--primary);color:var(--on-primary);font-weight:800;font-size:12px;
+}
+.cpoc-id .nm{font-size:12.5px;font-weight:700;line-height:1.3}
+.cpoc-id .de{font-size:11px;color:var(--text-2);margin-top:1px}
+.cpoc-id .dep{font-size:10.5px;color:var(--text-3);margin-top:2px}
+.cpoc-live{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:650;margin-top:3px}
+.cpoc-live.on{color:var(--st-resolved)} .cpoc-live.off{color:var(--st-rejected)}
+.cpoc-kv{display:flex;flex-direction:column;gap:4px}
+.cpoc-kv div{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--text-2)}
+.cpoc-kv b{color:var(--text);font-weight:600;text-align:right}
+.cpoc-kv .mono{font-family:var(--mono);font-size:10.5px}
+.chan-list{display:flex;flex-wrap:wrap;gap:5px}
+.chan-tag{
+  display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:650;padding:3px 7px;border-radius:999px;
+  background:var(--surface-2);border:1px solid var(--line-2);color:var(--text-2);
+}
+.chan-tag svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.chan-tag.off{color:var(--text-3);border-style:dashed;text-decoration:line-through}
+
+/* not-assigned / partial notices */
+.notice{
+  display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:6px;font-size:11.5px;line-height:1.5;
+  background:var(--surface-3);border:1px dashed var(--line-2);color:var(--text-2);
+}
+.notice.warn{background:var(--p1-wash);border-color:var(--p1-edge);color:var(--p1-fg);border-style:solid}
+.notice svg{width:14px;height:14px;flex:none;margin-top:1px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
+/* loading + error, reused everywhere */
+.sk{
+  background:var(--skeleton);border-radius:4px;position:relative;overflow:hidden;
+  background-image:linear-gradient(90deg,transparent,var(--skeleton-sheen),transparent);
+  background-size:220px 100%;background-repeat:no-repeat;animation:sheen 1.25s infinite linear;
+}
+.sk-row{height:11px;margin-bottom:7px}
+.sk-row.w40{width:40%} .sk-row.w60{width:60%} .sk-row.w80{width:80%}
+.sk-av{width:34px;height:34px;border-radius:8px;flex:none}
+.err{
+  display:flex;gap:9px;align-items:flex-start;padding:10px;border-radius:6px;font-size:11.5px;line-height:1.5;
+  background:var(--p0-wash);border:1px solid var(--p0-edge);color:var(--p0-fg);
+}
+.err svg{width:14px;height:14px;flex:none;margin-top:1px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.err .btn{margin-left:auto;flex:none}
+
+/* activity trail stub */
+.trail{display:flex;flex-direction:column;gap:5px}
+.trail div{display:flex;gap:7px;font-size:10.5px;color:var(--text-3);align-items:baseline}
+.trail .t{font-family:var(--mono);flex:none;color:var(--text-2)}
+
+/* ============================================================
+   MODALS / SHEETS
+   ============================================================ */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:100;display:grid;place-items:center;padding:28px}
+.modal{
+  background:var(--surface);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--shadow-xl);
+  width:100%;max-height:100%;display:flex;flex-direction:column;overflow:hidden;
+}
+.modal.sm{max-width:404px}
+.modal.xs{max-width:340px}
+.modal.lg{max-width:1000px}
+.modal-hd{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px}
+.modal-hd h3{margin:0;font-size:14px;font-weight:700}
+.modal-hd p{margin:3px 0 0;font-size:11px;color:var(--text-3)}
+.modal-hd .x{
+  margin-left:auto;background:none;border:0;color:var(--text-3);font-size:19px;cursor:pointer;
+  width:var(--tap);height:38px;border-radius:5px;line-height:1;
+}
+.modal-hd .x:hover{background:var(--surface-2);color:var(--text)}
+.modal-bd{padding:18px;overflow:auto}
+
+/* channel chooser */
+.chan-opt{
+  display:flex;width:100%;align-items:center;gap:11px;padding:11px 12px;min-height:56px;border-radius:8px;
+  background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);cursor:pointer;text-align:left;margin-bottom:8px;
+}
+.chan-opt{text-decoration:none;color:var(--text)}
+.chan-opt:hover{background:var(--surface-3);border-color:var(--control)}
+.chan-opt:last-child{margin-bottom:0}
+.chan-ic{
+  width:34px;height:34px;border-radius:8px;flex:none;display:grid;place-items:center;
+  background:var(--primary-wash);border:1px solid var(--primary-edge);color:var(--primary-fg);
+}
+.chan-ic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.chan-opt > span:nth-child(2){min-width:0;flex:1}
+.chan-opt .nm{display:block;font-size:12.5px;font-weight:650}
+.chan-opt .vl{display:block;font-size:11px;color:var(--text-2);font-family:var(--mono);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chan-opt .go{margin-left:auto;color:var(--text-3);font-size:16px}
+
+/* CPOC modal */
+.cpoc-top{display:flex;gap:13px;align-items:center;margin-bottom:15px}
+.cpoc-av{width:52px;height:52px;border-radius:11px;display:grid;place-items:center;font-size:17px;font-weight:800;background:var(--primary);color:var(--on-primary);flex:none}
+.cpoc-top h4{margin:0;font-size:16px;font-weight:700}
+.cpoc-top p{margin:3px 0 0;font-size:11.5px;color:var(--text-2)}
+.cpoc-top .live{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;margin-top:5px;font-weight:650}
+.phone{
+  background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;padding:13px 15px;margin-bottom:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.phone .num{font-family:var(--mono);font-size:19px;font-weight:700}
+.phone .l{font-size:9.5px;letter-spacing:.12em;color:var(--text-3);font-weight:700;margin-bottom:4px}
+.cpoc-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:15px}
+.modal .cpoc-kv{border-top:1px solid var(--line);padding-top:12px;gap:8px}
+.modal .cpoc-kv div{font-size:11.5px}
+.msgbox{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+textarea{
+  width:100%;background:var(--surface-2);border:1px solid var(--control);border-radius:7px;color:var(--text);
+  padding:9px 11px;font:12.5px/1.5 var(--sans);resize:vertical;min-height:74px;
+}
+textarea:focus{border-color:var(--focus);outline:none}
+.msg-foot{display:flex;align-items:center;gap:9px;margin-top:9px}
+.msg-foot .note{font-size:10.5px;color:var(--text-3);margin-right:auto}
+
+/* gallery */
+.gal{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+.shot{background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;overflow:hidden;cursor:pointer;text-align:left;padding:0;color:inherit}
+.shot:hover{border-color:var(--control)}
+.shot .img{position:relative;aspect-ratio:4/3;background:var(--surface-3);overflow:hidden}
+.shot .img svg{width:100%;height:100%;display:block}
+.shot .badge{
+  position:absolute;top:7px;left:7px;font-family:var(--mono);font-size:9px;font-weight:700;
+  background:var(--toast-bg);border:1px solid var(--line-2);color:var(--unit-text);padding:2.5px 6px;border-radius:4px;
+}
+.shot .vf{
+  position:absolute;top:7px;right:7px;display:flex;align-items:center;gap:4px;font-size:9px;font-weight:700;
+  background:var(--toast-bg);border:1px solid var(--p3-edge);color:var(--p3-fg);padding:2.5px 6px;border-radius:4px;
+}
+.shot .cap{padding:9px 10px 10px;border-top:1px solid var(--line)}
+.shot .cap .t{font-family:var(--mono);font-size:10.5px;font-weight:650;color:var(--text)}
+.shot .cap .c{font-family:var(--mono);font-size:9.5px;color:var(--text-3);margin-top:3px}
+.shot .cap .u{font-size:10px;color:var(--text-2);margin-top:5px;display:flex;gap:6px;align-items:center}
+
+/* lightbox */
+.lb{position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(6px);z-index:120;display:flex;flex-direction:column;padding:22px 26px}
+.lb-hd{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.lb-hd h4{margin:0;font-size:13px;font-weight:700}
+.lb-hd .sub{font-size:11px;color:var(--text-2)}
+.lb-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 292px;gap:20px}
+.lb-img{background:var(--surface);border:1px solid var(--line-2);border-radius:11px;overflow:hidden;display:grid;place-items:center;position:relative}
+#lbCanvas{position:relative;aspect-ratio:4/3;width:100%;max-width:min(100%,calc((100vh - 190px) * 4 / 3));margin:auto;border-radius:6px;overflow:hidden}
+.lb-img svg{width:100%;height:100%;display:block}
+.lb-nav{
+  position:absolute;top:50%;transform:translateY(-50%);width:var(--tap);height:var(--tap);border-radius:50%;
+  background:var(--surface);border:1px solid var(--control);color:var(--text);cursor:pointer;display:grid;place-items:center;font-size:16px;
+}
+.lb-nav:hover{background:var(--surface-3)}
+.lb-nav.prev{left:14px} .lb-nav.next{right:14px}
+.lb-meta{background:var(--surface);border:1px solid var(--line-2);border-radius:11px;padding:15px 16px;overflow:auto}
+.lb-meta h5{margin:0 0 11px;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-3)}
+.lb-meta .kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--text-2)}
+.lb-meta .kv:last-of-type{border-bottom:0}
+.lb-meta .kv b{color:var(--text);font-weight:600;font-family:var(--mono);font-size:11px;text-align:right;word-break:break-all}
+.chain{margin-top:13px;padding:11px;border-radius:8px;background:var(--p3-wash);border:1px solid var(--p3-edge);font-size:11px;color:var(--p3-fg);line-height:1.5}
+
+/* toast */
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);opacity:0;
+  background:var(--toast-bg);border:1px solid var(--line-2);border-radius:8px;padding:11px 15px;
+  font-size:12px;color:var(--toast-text);z-index:200;box-shadow:var(--shadow-xl);pointer-events:none;
+  display:flex;align-items:center;gap:9px;transition:opacity .2s ease,transform .2s ease;max-width:min(560px,90vw);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .ok{width:7px;height:7px;border-radius:50%;background:var(--p3);flex:none}
+
+</style>
+<script>
+/* Theme bootstrap — runs before the app paints so a stored override never flashes.
+   'system' (default) stores nothing and lets prefers-color-scheme decide. */
+(function(){
+  /* Light is this build's default. A stored 'system' hands control back to the
+     OS; a stored 'dark' pins dark. Runs before paint so nothing flashes. */
+  var t = 'light';
+  try{ t = localStorage.getItem('unires.theme') || 'light'; }catch(e){}
+  if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="hdr">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 2.5 3.5 8.2v9.1c0 7 5.3 11.4 12.5 13.2 7.2-1.8 12.5-6.2 12.5-13.2V8.2z" fill="none" stroke-width="1.8"/>
+        <path d="M16 9v8.5M16 22.2v.1" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="16" cy="16" r="13.6" fill="none" stroke-opacity=".22" stroke-width="1"/>
+      </svg>
+      <div class="brand-txt">
+        <span class="brand-name">UNIRES</span>
+        <span class="brand-sub">Unified Disaster Response · Kanara State Command Centre</span>
+      </div>
+    </div>
+
+    <div class="hdr-mid">
+      <span class="env-pill"><span class="dot"></span>STATE ALERT LEVEL — RED</span>
+      <span class="lbl" style="letter-spacing:.1em">SDMA / EOC · TRIVANDRUM</span>
+    </div>
+
+    <div class="hdr-right">
+      <button class="linkbtn" onclick="toast('Audit log is read-only and export-ready (M11).')">Audit log</button>
+      <button class="linkbtn" onclick="toast('Drill mode is off — actions affect live records.')">Drill mode: OFF</button>
+      <button class="acct-btn" id="acctBtn" aria-haspopup="menu" aria-expanded="false">
+        <span class="avatar">DK</span>
+        <span class="acct-meta">
+          <span class="acct-name">D. Krishnankutty</span>
+          <span class="acct-role">State Controller</span>
+        </span>
+        <svg class="caret" viewBox="0 0 12 12"><path d="M3 4.5 6 7.5 9 4.5"/></svg>
+      </button>
+    </div>
+
+    <div class="menu hidden" id="acctMenu" role="menu">
+      <div class="menu-head">
+        <span class="avatar">DK</span>
+        <div>
+          <b>D. Krishnankutty, IAS</b>
+          <span>State Controller · Command Centre</span>
+          <span style="color:var(--st-resolved);margin-top:3px">Service no. KS-CC-0114 · device bound</span>
+        </div>
+      </div>
+      <button class="menu-item" role="menuitem" onclick="toast('Profile &amp; credentials — service record, agency, device binding.')">Profile &amp; credentials</button>
+      <button class="menu-item" role="menuitem" onclick="toast('Area scope: all 9 districts of Kanara State.')">Area scope <span class="k">9 areas</span></button>
+      <button class="menu-item" role="menuitem" onclick="toast('Notification routing: P0 always breaks through.')">Notification routing</button>
+      <button class="menu-item" role="menuitem" onclick="toast('Sign-off requires an active successor — Deputy Controller notified.')">Handover / shift sign-off</button>
+      <div class="menu-sep"></div>
+      <div class="menu-demo">
+        <div class="lbl">Dev · simulated API</div>
+        <div class="seg" id="netSeg" role="group" aria-label="Simulated network conditions">
+          <button data-net="normal" aria-pressed="true">Normal</button>
+          <button data-net="slow" aria-pressed="false">Slow</button>
+          <button data-net="fail" aria-pressed="false">Fail</button>
+        </div>
+      </div>
+      <div class="menu-sep"></div>
+      <div class="menu-demo">
+        <div class="lbl">Appearance</div>
+        <div class="seg" id="themeSeg" role="group" aria-label="Colour theme">
+          <button data-choice="system" aria-pressed="true" title="Follow the operating system setting">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+          <button data-choice="light" aria-pressed="false" title="Always light">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>Light</button>
+          <button data-choice="dark" aria-pressed="false" title="Always dark">
+            <svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+        </div>
+      </div>
+      <div class="menu-sep"></div>
+      <div class="menu-demo">
+        <div class="lbl">Demo · elapsed-timer thresholds</div>
+        <div class="seg" id="demoSeg">
+          <button data-h="2.4">2h 24m</button>
+          <button data-h="18.7" class="on">18h 42m</button>
+          <button data-h="21.9">21h 54m</button>
+        </div>
+      </div>
+      <div class="menu-sep"></div>
+      <button class="menu-item" role="menuitem" onclick="toast('Session ended locally. Offline token revoked at next sync.')">Sign out</button>
+    </div>
+  </header>
+
+  <!-- ===================== STATUS STRIP ===================== -->
+  <section class="strip">
+    <div class="clock">
+      <div class="clk-time mono" id="clkTime">--:--:--<span class="tz">IST</span></div>
+      <div class="clk-date" id="clkDate">—</div>
+    </div>
+
+    <div class="vsep"></div>
+
+    <div class="elapsed">
+      <div class="lbl">Longest active emergency · Karippodu</div>
+      <div class="elapsed-row">
+        <span class="mono t-amber" id="elapsedVal">18h 42m</span>
+        <button class="counter" id="districtCounter" aria-haspopup="true"><span class="dot"></span><span id="counterTxt">3 districts active</span></button>
+        <span class="sub" id="protoNote">recovery-protocol review at 24h</span>
+      </div>
+      <div class="track"><i id="elapsedBar"></i><b style="left:25%"></b><b style="left:83.3%"></b></div>
+    </div>
+
+    <div class="pop hidden" id="districtPop">
+      <h4>Districts in EMERGENCY</h4>
+      <div id="districtPopList"></div>
+    </div>
+
+    <div class="vsep"></div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="lbl">Open incidents by severity</div>
+        <div class="sevrow" id="sevRow"></div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Units deployed</div>
+        <div class="val mono" id="unitStat">6</div>
+        <div class="sml" id="unitSub">4 engaged · 1 en route · 1 staging</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Civilian intake queue</div>
+        <div class="val mono">7 <span style="font-size:11px;color:var(--text-3);font-weight:600">unverified</span></div>
+        <div class="sml">2 promoted in last 30m</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Network</div>
+        <div class="val" style="font-size:12.5px;font-weight:650"><span class="pulse-dot"></span>Mesh gateway up</div>
+        <div class="sml">2 areas offline-synced · last drain 41s</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main" id="main">
+
+    <!-- ---------- MAP ---------- -->
+    <div class="mapwrap" id="mapwrap">
+      <svg id="map" viewBox="0 0 1000 720" preserveAspectRatio="xMidYMid meet" role="application" aria-label="Kanara State operational map">
+        <defs>
+          <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+            <path d="M50 0H0V50" class="map-grid" stroke-width="1"/>
+          </pattern>
+          <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="9"/>
+          </filter>
+        </defs>
+        <rect width="1000" height="720" class="map-water"/>
+        <rect width="1000" height="720" fill="url(#grid)"/>
+        <g id="viewport">
+          <g id="glow"></g>
+          <g id="districts"></g>
+          <g id="dlabels"></g>
+          <g id="units"></g>
+          <g id="incidents"></g>
+        </g>
+      </svg>
+
+      <!-- district action card -->
+      <div class="ov dcard hidden" id="dcard">
+        <button class="dcard-close" id="dcardClose" aria-label="Clear district selection">&times;</button>
+        <div class="dcard-hd">
+          <div style="min-width:0">
+            <h3 id="dcName">—</h3>
+            <p id="dcProfile">—</p>
+          </div>
+          <span class="state-pill dstate-NORMAL" id="dcState">NORMAL</span>
+        </div>
+        <div class="dcard-body">
+          <div class="dstats" id="dcStats"></div>
+          <div class="dmeta" id="dcMeta"></div>
+          <div class="dcard-actions">
+            <button class="btn primary" id="btnCpoc">
+              <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>
+              Contact CPOC
+            </button>
+            <button class="btn" id="btnPhotos">
+              <svg viewBox="0 0 24 24"><path d="M3 7h3.5L8 5h8l1.5 2H21v12H3z"/><circle cx="12" cy="13" r="3.4"/></svg>
+              View photos <span class="mono" id="photoCount" style="color:var(--text-3);font-size:10.5px"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- incident callout -->
+      <div class="ov callout hidden" id="callout"></div>
+
+      <!-- map controls -->
+      <div class="ov mapctl">
+        <button id="zoomIn" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button id="zoomOut" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+        <button id="zoomReset" title="Reset view" aria-label="Reset view"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 15v5h-5M20 9V4h-5M4 15v5h5"/></svg></button>
+      </div>
+
+      <!-- legend -->
+      <div class="ov legend">
+        <div class="grp">
+          <div class="lbl">Incident severity</div>
+          <div class="lgd"><span class="sw" style="background:var(--p0)"></span><b>P0</b> Life at immediate risk</div>
+          <div class="lgd"><span class="sw" style="background:var(--p1)"></span><b>P1</b> Serious, not immediate</div>
+          <div class="lgd"><span class="sw" style="background:var(--p2)"></span><b>P2</b> Infrastructure / access</div>
+          <div class="lgd"><span class="sw" style="background:var(--p3)"></span><b>P3</b> Logistics / welfare</div>
+        </div>
+        <div class="grp">
+          <div class="lbl">Status ring</div>
+          <div class="lgd"><span class="rng" style="border-style:dashed"></span>Reported / triaged</div>
+          <div class="lgd"><span class="rng"></span>Assigned / in progress</div>
+          <div class="lgd"><span class="rng" style="border-color:var(--marker-ring-strong)"></span>Resolved — awaiting verification</div>
+        </div>
+        <div class="grp">
+          <div class="lbl">Other layers</div>
+          <div class="lgd"><span class="sq" style="background:var(--unit-fill);border:1.4px solid var(--accent-2)"></span>Deployed agency unit</div>
+          <div class="lgd"><span class="sq" style="background:var(--map-em);border:1px solid var(--map-em-stroke)"></span>District in EMERGENCY</div>
+          <div class="lgd"><span class="sq" style="background:var(--map-al);border:1px solid var(--map-al-stroke)"></span>District in ALERT</div>
+        </div>
+      </div>
+
+      <div class="ov coords" id="mapCoords">11.9042° N · 75.4318° E · zoom 1.0×</div>
+    </div>
+
+    <!-- ---------- SIDE PANEL ---------- -->
+    <aside class="panel" id="panel">
+      <div class="panel-rail">
+        <button class="icon-btn" id="railExpand" title="Expand issue list" aria-label="Expand issue list">
+          <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <span class="rail-count mono" id="railCount">12</span>
+        <span class="rail-txt">Issues reported</span>
+      </div>
+
+      <div class="panel-inner">
+        <div class="panel-hd">
+          <h2>Issues reported</h2>
+          <span class="cnt" id="listCount">12 / 12</span>
+          <button class="icon-btn" id="panelCollapse" title="Collapse panel" aria-label="Collapse panel">
+            <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+
+        <div class="filters">
+          <div class="frow" id="sevChips"></div>
+          <div class="frow">
+            <select id="fType"><option value="">All types</option></select>
+            <select id="fStatus"><option value="">All statuses</option></select>
+          </div>
+          <div class="frow">
+            <select id="fAgency"><option value="">All agencies</option></select>
+            <button class="btn sm" id="clearFilters" style="flex:none">Clear</button>
+          </div>
+          <div class="frow hidden" id="dfilterRow">
+            <span class="dfilter">District: <b id="dfilterName">—</b><button id="dfilterClear" aria-label="Clear district filter">&times;</button></span>
+          </div>
+        </div>
+
+        <div class="sortnote">Sorted by severity → age. P0 past target response is flagged.</div>
+        <div class="list" id="list" role="listbox" aria-label="Reported issues"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ===================== MODALS ===================== -->
+<div class="scrim hidden" id="cpocScrim">
+  <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="cpocTitle">
+    <div class="modal-hd">
+      <div>
+        <h3 id="cpocTitle">Contact CPOC</h3>
+        <p id="cpocSub">—</p>
+      </div>
+      <button class="x" data-close="cpocScrim" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-bd" id="cpocBody"></div>
+  </div>
+</div>
+
+<div class="scrim hidden" id="chanScrim">
+  <div class="modal xs" role="dialog" aria-modal="true" aria-labelledby="chanTitle">
+    <div class="modal-hd">
+      <div>
+        <h3 id="chanTitle">Contact CPOC</h3>
+        <p id="chanSub">—</p>
+      </div>
+      <button class="x" data-close="chanScrim" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-bd" id="chanBody"></div>
+  </div>
+</div>
+
+<div class="scrim hidden" id="galScrim">
+  <div class="modal lg" role="dialog" aria-modal="true" aria-labelledby="galTitle">
+    <div class="modal-hd">
+      <div>
+        <h3 id="galTitle">Uploaded photos</h3>
+        <p id="galSub">—</p>
+      </div>
+      <button class="x" data-close="galScrim" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-bd" id="galBody"></div>
+  </div>
+</div>
+
+<div class="lb hidden" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo evidence viewer">
+  <div class="lb-hd">
+    <div>
+      <h4 id="lbTitle">—</h4>
+      <div class="sub" id="lbSub">—</div>
+    </div>
+    <button class="btn sm" style="margin-left:auto" data-close="lightbox">Close</button>
+  </div>
+  <div class="lb-body">
+    <div class="lb-img" id="lbImg">
+      <button class="lb-nav prev" id="lbPrev" aria-label="Previous photo">&#8249;</button>
+      <button class="lb-nav next" id="lbNext" aria-label="Next photo">&#8250;</button>
+    </div>
+    <div class="lb-meta" id="lbMeta"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="ok"></span><span id="toastMsg"></span></div>
+
+<script>
+/* ============================================================
+   SAMPLE DATA — Kanara State (fictional)
+   ============================================================ */
+
+const DISTRICTS = [
+  { id:'vellamunda', name:'Vellamunda', profile:'Coastal delta · pop. 3.4 L', state:'EMERGENCY', sinceH:9.13,
+    path:'M120 60 L255 30 L390 42 L375 150 L360 255 L215 275 L70 240 L60 145 Z', cx:150, cy:100, camps:4, hazard:'River flood + storm surge' },
+  { id:'chandragiri', name:'Chandragiri', profile:'Coastal plain · pop. 2.6 L', state:'ALERT', sinceH:14.35,
+    path:'M390 42 L540 70 L690 58 L715 145 L700 235 L530 215 L360 255 L375 150 Z', cx:470, cy:110, camps:2, hazard:'Cyclone track — CAT 2 cone' },
+  { id:'ottakkal', name:'Ottakkal', profile:'Upland plateau · pop. 1.9 L', state:'NORMAL', sinceH:null,
+    path:'M690 58 L820 45 L945 80 L975 170 L960 265 L830 250 L700 235 L715 145 Z', cx:832, cy:155, camps:0, hazard:'—' },
+  { id:'karippodu', name:'Karippodu', profile:'Urban port · pop. 4.1 L', state:'EMERGENCY', sinceH:18.70,
+    path:'M70 240 L215 275 L360 255 L350 370 L395 485 L250 440 L110 470 L40 355 Z', cx:130, cy:300, camps:7, hazard:'Urban flood + structural collapse' },
+  { id:'nedumbara', name:'Nedumbara', profile:'Midland urban · pop. 3.0 L', state:'ALERT', sinceH:6.45,
+    path:'M360 255 L530 215 L700 235 L640 345 L675 455 L535 510 L395 485 L350 370 Z', cx:528, cy:358, camps:1, hazard:'Dam release — 3 shutters open' },
+  { id:'thodupara', name:'Thodupara', profile:'Hill · high slope risk · pop. 1.4 L', state:'EMERGENCY', sinceH:3.22,
+    path:'M700 235 L830 250 L960 265 L915 375 L930 480 L800 445 L675 455 L640 345 Z', cx:880, cy:300, camps:3, hazard:'Landslide cluster — GSI red' },
+  { id:'manalvayal', name:'Manalvayal', profile:'Coastal wetland · pop. 2.2 L', state:'NORMAL', sinceH:null,
+    path:'M110 470 L250 440 L395 485 L445 590 L430 690 L300 700 L180 660 L135 575 Z', cx:288, cy:572, camps:0, hazard:'—' },
+  { id:'kanjirode', name:'Kanjirode', profile:'Midland agri · pop. 2.8 L', state:'NORMAL', sinceH:null,
+    path:'M395 485 L535 510 L675 455 L730 560 L700 665 L565 660 L430 690 L445 590 Z', cx:558, cy:578, camps:0, hazard:'—' },
+  { id:'poovathur', name:'Poovathur', profile:'Hill forest · pop. 1.1 L', state:'NORMAL', sinceH:null,
+    path:'M675 455 L800 445 L930 480 L930 565 L895 640 L800 690 L700 665 L730 560 Z', cx:812, cy:565, camps:0, hazard:'—' }
+];
+
+const TYPES = {
+  flood:      { label:'Flooding',           d:'M3 15c3 0 3-2.4 6-2.4S12 15 15 15s3-2.4 6-2.4M3 20c3 0 3-2.4 6-2.4S12 20 15 20s3-2.4 6-2.4M6 11V6l6-3 6 3v5' },
+  collapse:   { label:'Structure collapse', d:'M3 20h18M6 20V8l7-3v15M13 12l5 1.5V20M9 20v-4h3v4' },
+  fire:       { label:'Fire',               d:'M12 3c.6 3 2.4 4 3.6 5.6A6.5 6.5 0 0 1 17 12.5a5 5 0 0 1-10 0c0-1.6.7-2.9 1.6-3.8.2 1.4.9 2.2 1.6 2.6-.3-3 .6-6.2 1.8-8.3z' },
+  medical:    { label:'Medical',            d:'M12 5v14M5 12h14' },
+  road:       { label:'Road / access',      d:'M6 20 8.5 4M18 20 15.5 4M12 5.5v2.5M12 11v2.5M12 16.5V19' },
+  landslide:  { label:'Landslide',          d:'M3 19h18M3 19 11 7l3.5 4L19 6M8 15.5h.01M12 17h.01M15.5 13h.01' },
+  power:      { label:'Power line down',    d:'M13 3 6 14h5l-1 7 8-12h-5z' },
+  gas:        { label:'Gas / chemical',     d:'M12 4l9 16H3zM12 10v5M12 17.6v.01' },
+  supply:     { label:'Supply / welfare',   d:'M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8' },
+  rescue:     { label:'Water rescue',       d:'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 4v4M12 16v4M4 12h4M16 12h4' }
+};
+
+const STATUS = {
+  REPORTED:   { label:'Reported',             ring:'dash',  cls:'s-open' },
+  TRIAGED:    { label:'Triaged',              ring:'dash',  cls:'s-triaged' },
+  ASSIGNED:   { label:'Assigned',             ring:'solid', cls:'s-assigned' },
+  IN_PROGRESS:{ label:'In progress',          ring:'solid', cls:'s-progress' },
+  RESOLVED:   { label:'Awaiting verification',ring:'white', cls:'s-resolved' }
+};
+
+const SEV_TARGET_MIN = [60, 360, 1440, 4320]; // P0 immediate, P1 hours, P2 same day, P3 post-rescue
+
+/* ============================================================
+   DATA CONTRACT
+   ------------------------------------------------------------
+   This mockup has no server. Rather than fake the data inline in
+   the view, the shapes the API must return are declared here, the
+   sample records are quarantined in SEED below, and every read
+   goes through `api.*` — so wiring a real backend means replacing
+   one module, not hunting literals through the UI.
+
+   CPOC follows the UNIRES spec (M1): one Concerned Point of
+   Contact per AREA — the district commander who approves
+   activation, verifies and closes incidents — with a MANDATORY
+   deputy in the succession chain. It is not a per-agency contact.
+
+   GET /areas/:areaId/cpoc  -> CpocRecord | 404
+   GET /incidents           -> Incident[]  (assignments inlined; see note)
+
+   @typedef {Object} Channel
+   @property {'phone'|'email'|'net'|'radio'} kind
+   @property {string}  value       tel/mailto target, or in-app route
+   @property {string}  label
+   @property {boolean} available   false => render it struck through, never a dead button
+
+   @typedef {Object} CpocRecord
+   @property {string}   areaId
+   @property {?string}  name         null => post vacant, deputy is acting (partial state)
+   @property {string}   designation
+   @property {string}   department   parent agency / department
+   @property {string}   jurisdiction office + area covered
+   @property {Channel[]} channels
+   @property {number}   assignedAt   epoch ms — when this officer took the CPOC role
+   @property {number}   updatedAt    epoch ms — last change to this record
+   @property {Object}   deputy       { name, designation, phone } — mandatory (M1)
+   @property {string}   heartbeat    last device contact, human-readable
+   @property {boolean}  online
+   @property {string}   link         transport currently carrying this area
+
+   @typedef {Object} AgencyAssignment
+   @property {'NDRF'|'SDRF'|'FIRE'|'POLICE'|'MEDICAL'} agency
+   @property {?string}  unit         call-sign, null if the agency is tasked but no unit named
+   @property {'lead'|'supporting'} role
+   @property {number}   agoMin       minutes since assignment (seed-relative; a real API sends epoch ms)
+
+   NOTE ON THE LIST ENDPOINT: assignments are inlined on each
+   Incident precisely so the list can render an agency indicator
+   per card without an N+1 fetch. CPOC is fetched separately and
+   cached per area, because it is area-scoped, not issue-scoped.
+   ============================================================ */
+
+const INCIDENTS = [
+  { id:'INC-2041', type:'collapse', sev:0, status:'IN_PROGRESS', ageMin:38, district:'karippodu',
+    x:255, y:330, title:'Collapse — 6 trapped, Ward 12', ll:'11.8642° N, 75.3711° E',
+    src:'RESPONDER', reports:4, reportingAgencies:3, photos:3,
+    assignments:[ { agency:'NDRF', unit:'NDRF-11', role:'lead', agoMin:31 },
+                  { agency:'FIRE', unit:'FIRE-04', role:'supporting', agoMin:26 },
+                  { agency:'MEDICAL', unit:'MED-05', role:'supporting', agoMin:22 } ] },
+
+  { id:'INC-2038', type:'flood', sev:0, status:'ASSIGNED', ageMin:74, district:'vellamunda',
+    x:210, y:165, title:'Rooftop rescue — Cheruvatta colony', ll:'12.0184° N, 75.2907° E',
+    src:'RESPONDER', reports:6, reportingAgencies:2, photos:2,
+    assignments:[ { agency:'SDRF', unit:'SDRF-02', role:'lead', agoMin:66 },
+                  { agency:'MEDICAL', unit:'MED-05', role:'supporting', agoMin:41 } ] },
+
+  { id:'INC-2049', type:'medical', sev:0, status:'REPORTED', ageMin:6, district:'thodupara',
+    x:730, y:290, title:'Casualty evac — hamlet cut off', ll:'11.7411° N, 75.8620° E',
+    src:'CIVILIAN_VERIFIED', reports:2, reportingAgencies:1, photos:1,
+    assignments:[] },
+
+  { id:'INC-2044', type:'landslide', sev:0, status:'TRIAGED', ageMin:21, district:'thodupara',
+    x:790, y:322, title:'Slope failure — vehicles buried', ll:'11.7188° N, 75.8894° E',
+    src:'RESPONDER', reports:3, reportingAgencies:2, photos:2,
+    assignments:[] },
+
+  { id:'INC-2033', type:'fire', sev:1, status:'ASSIGNED', ageMin:96, district:'karippodu',
+    x:178, y:414, title:'Transformer fire — godown row', ll:'11.8309° N, 75.3402° E',
+    src:'RESPONDER', reports:2, reportingAgencies:1, photos:1,
+    assignments:[ { agency:'FIRE', unit:'FIRE-04', role:'lead', agoMin:88 } ] },
+
+  { id:'INC-2030', type:'medical', sev:1, status:'IN_PROGRESS', ageMin:142, district:'vellamunda',
+    x:302, y:120, title:'Dialysis patients cut off at PHC', ll:'12.0620° N, 75.3355° E',
+    src:'RESPONDER', reports:1, reportingAgencies:1, photos:1,
+    assignments:[ { agency:'MEDICAL', unit:'MED-05', role:'lead', agoMin:130 } ] },
+
+  { id:'INC-2046', type:'flood', sev:1, status:'REPORTED', ageMin:11, district:'vellamunda',
+    x:158, y:214, title:'Bund breach widening, canal road', ll:'11.9903° N, 75.2611° E',
+    src:'CIVILIAN_UNVERIFIED', reports:12, reportingAgencies:0, photos:0,
+    assignments:[] },
+
+  { id:'INC-2022', type:'gas', sev:1, status:'IN_PROGRESS', ageMin:268, district:'karippodu',
+    x:322, y:380, title:'LPG leak — bottling unit gate 3', ll:'11.8471° N, 75.4066° E',
+    src:'RESPONDER', reports:2, reportingAgencies:2, photos:2,
+    assignments:[ { agency:'FIRE', unit:'FIRE-09', role:'lead', agoMin:255 },
+                  { agency:'POLICE', unit:'POL-17', role:'supporting', agoMin:250 } ] },
+
+  { id:'INC-2027', type:'road', sev:2, status:'ASSIGNED', ageMin:205, district:'thodupara',
+    x:862, y:396, title:'Bridge approach washed out — MDR-14', ll:'11.7002° N, 75.9215° E',
+    src:'RESPONDER', reports:3, reportingAgencies:2, photos:1,
+    assignments:[ { agency:'POLICE', unit:'POL-17', role:'lead', agoMin:190 } ] },
+
+  { id:'INC-2035', type:'power', sev:2, status:'TRIAGED', ageMin:118, district:'nedumbara',
+    x:600, y:300, title:'HT line down across market street', ll:'11.8955° N, 75.6402° E',
+    src:'CIVILIAN_VERIFIED', reports:5, reportingAgencies:1, photos:0,
+    assignments:[] },
+
+  { id:'INC-2052', type:'road', sev:2, status:'REPORTED', ageMin:47, district:'ottakkal',
+    x:890, y:180, title:'Culvert washout on plateau link road', ll:'12.0912° N, 75.8104° E',
+    src:'CIVILIAN_VERIFIED', reports:2, reportingAgencies:0, photos:0,
+    assignments:[] },
+
+  { id:'INC-2018', type:'supply', sev:3, status:'ASSIGNED', ageMin:311, district:'chandragiri',
+    x:560, y:158, title:'Relief stock short — Camp 3', ll:'12.0448° N, 75.6120° E',
+    src:'RESPONDER', reports:1, reportingAgencies:1, photos:2,
+    assignments:[ { agency:'SDRF', unit:'SDRF-07', role:'lead', agoMin:296 } ] },
+
+  { id:'INC-2054', type:'supply', sev:3, status:'TRIAGED', ageMin:402, district:'poovathur',
+    x:860, y:610, title:'Fodder drop request — forest fringe', ll:'11.6820° N, 75.8890° E',
+    src:'RESPONDER', reports:1, reportingAgencies:1, photos:0,
+    assignments:[] },
+
+  { id:'INC-2015', type:'rescue', sev:3, status:'RESOLVED', ageMin:342, district:'nedumbara',
+    x:470, y:432, title:'Waterlogging cleared — Ward 4', ll:'11.8620° N, 75.5588° E',
+    src:'RESPONDER', reports:2, reportingAgencies:1, photos:1,
+    assignments:[ { agency:'SDRF', unit:'SDRF-07', role:'lead', agoMin:330 } ] }
+];
+
+const UNITS = [
+  { id:'NDRF-11', agency:'NDRF',    label:'NDRF-11', state:'ENGAGED',   district:'karippodu',  x:272, y:302, note:'14 pax · cutting + search dog', task:'INC-2041' },
+  { id:'FIRE-04', agency:'FIRE',    label:'FIRE-04', state:'EN_ROUTE',  district:'karippodu',  x:150, y:382, note:'2 tenders · ETA 6 min',        task:'INC-2033' },
+  { id:'SDRF-02', agency:'SDRF',    label:'SDRF-02', state:'ENGAGED',   district:'vellamunda', x:238, y:196, note:'2 boats · swift-water',        task:'INC-2038' },
+  { id:'MED-05',  agency:'MEDICAL', label:'MED-05',  state:'ENGAGED',   district:'vellamunda', x:318, y:148, note:'Mobile medical team',          task:'INC-2030' },
+  { id:'POL-17',  agency:'POLICE',  label:'POL-17',  state:'ENGAGED',   district:'thodupara',  x:834, y:352, note:'Traffic cordon · MDR-14',      task:'INC-2027' },
+  { id:'SDRF-07', agency:'SDRF',    label:'SDRF-07', state:'AVAILABLE', district:'nedumbara',  x:520, y:468, note:'Staging · 9 pax uncommitted',  task:null }
+];
+
+
+/* ============================================================
+   SEED DATA — LOCAL DEV ONLY
+   ------------------------------------------------------------
+   Fictional records for a fictional state. NOT shipped defaults:
+   a deployment must load real CpocRecords from M12 (Admin &
+   Configuration). Nothing here is a real person, number, or
+   address. If SEED is empty the UI degrades to its explicit
+   "Not yet assigned" state — it never invents a contact.
+   ============================================================ */
+const SEED = {
+  /** @type {Object<string, CpocRecord>} keyed by areaId */
+  cpoc: {
+    karippodu:{
+      areaId:'karippodu', name:'Meera Nandakumar, IAS', designation:'District Collector · CPOC',
+      department:'Kanara State Disaster Management Authority', jurisdiction:'Karippodu District EOC · Ward 1–24',
+      assignedAtMin: 1122, updatedAtMin: 12, heartbeat:'12s', online:true, link:'Satellite + mesh gateway',
+      deputy:{ name:'V. Anand Kumar', designation:'Sub-Collector · Deputy CPOC', phone:'+91 94470 22119' },
+      channels:[
+        { kind:'phone', value:'+91 94470 22118', label:'Primary line', available:true },
+        { kind:'email', value:'cpoc.karippodu@kanara.gov.in', label:'District EOC mail', available:true },
+        { kind:'net',   value:'KRP-1', label:'District net (in-app)', available:true },
+        { kind:'radio', value:'VHF 148.750 · Net KRP-1', label:'Radio', available:true }
+      ]
+    },
+    vellamunda:{
+      areaId:'vellamunda', name:'S. Rajeev Menon, IPS', designation:'District Collector · CPOC',
+      department:'Kanara State Disaster Management Authority', jurisdiction:'Vellamunda District EOC · Coastal delta',
+      assignedAtMin: 548, updatedAtMin: 64, heartbeat:'1m 04s', online:true, link:'Mesh only — towers down',
+      deputy:{ name:'Fatima Rasheed', designation:'ADM · Deputy CPOC', phone:'+91 94470 33208' },
+      channels:[
+        // towers are down in this area: cellular and mail cannot be reached, and the
+        // UI must show that rather than offering a button that goes nowhere
+        { kind:'phone', value:'+91 94470 33207', label:'Primary line', available:false },
+        { kind:'email', value:'cpoc.vellamunda@kanara.gov.in', label:'District EOC mail', available:false },
+        { kind:'net',   value:'VLM-1', label:'District net (in-app, over mesh)', available:true },
+        { kind:'radio', value:'VHF 149.100 · Net VLM-1', label:'Radio', available:true }
+      ]
+    },
+    thodupara:{
+      areaId:'thodupara', name:'K. Ganesan, IAS', designation:'District Collector · CPOC',
+      department:'Kanara State Disaster Management Authority', jurisdiction:'Thodupara District EOC · Hill circle',
+      assignedAtMin: 193, updatedAtMin: 6, heartbeat:'6s', online:true, link:'Cellular',
+      deputy:{ name:'T. Sunitha', designation:'Sub-Collector · Deputy CPOC', phone:'+91 94470 41563' },
+      channels:[
+        { kind:'phone', value:'+91 94470 41562', label:'Primary line', available:true },
+        { kind:'email', value:'cpoc.thodupara@kanara.gov.in', label:'District EOC mail', available:true },
+        { kind:'net',   value:'THP-1', label:'District net (in-app)', available:true },
+        { kind:'radio', value:'VHF 148.325 · Net THP-1', label:'Radio', available:true }
+      ]
+    },
+    chandragiri:{
+      areaId:'chandragiri', name:'A. Prasad Nair, IAS', designation:'District Collector · CPOC',
+      department:'Kanara State Disaster Management Authority', jurisdiction:'Chandragiri District EOC · Coastal plain',
+      assignedAtMin: 861, updatedAtMin: 18, heartbeat:'18s', online:true, link:'Cellular',
+      deputy:{ name:'M. Leelamma', designation:'ADM · Deputy CPOC', phone:'+91 94470 55342' },
+      channels:[
+        { kind:'phone', value:'+91 94470 55341', label:'Primary line', available:true },
+        { kind:'email', value:'cpoc.chandragiri@kanara.gov.in', label:'District EOC mail', available:true },
+        { kind:'net',   value:'CHG-1', label:'District net (in-app)', available:true },
+        { kind:'radio', value:'VHF 149.400 · Net CHG-1', label:'Radio', available:true }
+      ]
+    },
+    nedumbara:{
+      areaId:'nedumbara', name:'R. Devika, IAS', designation:'District Collector · CPOC',
+      department:'Kanara State Disaster Management Authority', jurisdiction:'Nedumbara District EOC · Midland',
+      assignedAtMin: 387, updatedAtMin: 34, heartbeat:'34s', online:true, link:'Cellular',
+      deputy:{ name:'P. Joseph', designation:'Sub-Collector · Deputy CPOC', phone:'+91 94470 66093' },
+      channels:[
+        { kind:'phone', value:'+91 94470 66092', label:'Primary line', available:true },
+        { kind:'email', value:'cpoc.nedumbara@kanara.gov.in', label:'District EOC mail', available:true },
+        { kind:'net',   value:'NDB-1', label:'District net (in-app)', available:true },
+        { kind:'radio', value:'VHF 148.900 · Net NDB-1', label:'Radio', available:true }
+      ]
+    },
+    manalvayal:{
+      areaId:'manalvayal', name:'C. Vinod Raj, IAS', designation:'District Collector · CPOC',
+      department:'Kanara State Disaster Management Authority', jurisdiction:'Manalvayal District EOC · Wetland',
+      assignedAtMin: 1440, updatedAtMin: 55, heartbeat:'55s', online:true, link:'Cellular',
+      deputy:{ name:'K. Ambily', designation:'Sub-Collector · Deputy CPOC', phone:'+91 94470 88604' },
+      channels:[
+        { kind:'phone', value:'+91 94470 88603', label:'Primary line', available:true },
+        { kind:'email', value:'cpoc.manalvayal@kanara.gov.in', label:'District EOC mail', available:true },
+        { kind:'net',   value:'MNV-1', label:'District net (in-app)', available:true },
+        { kind:'radio', value:'VHF 148.200 · Net MNV-1', label:'Radio', available:true }
+      ]
+    },
+    kanjirode:{
+      areaId:'kanjirode', name:'N. Faisal Rahman, IAS', designation:'District Collector · CPOC',
+      department:'Kanara State Disaster Management Authority', jurisdiction:'Kanjirode District EOC · Agri belt',
+      assignedAtMin: 1290, updatedAtMin: 72, heartbeat:'1m 12s', online:true, link:'Cellular',
+      deputy:{ name:'G. Remya', designation:'ADM · Deputy CPOC', phone:'+91 94470 99275' },
+      channels:[
+        { kind:'phone', value:'+91 94470 99274', label:'Primary line', available:true },
+        { kind:'email', value:'cpoc.kanjirode@kanara.gov.in', label:'District EOC mail', available:true },
+        { kind:'net',   value:'KNJ-1', label:'District net (in-app)', available:true },
+        { kind:'radio', value:'VHF 149.250 · Net KNJ-1', label:'Radio', available:true }
+      ]
+    },
+    // PARTIAL RECORD: post vacant mid-handover, deputy is acting. The UI must
+    // render what exists and route contact to the deputy — not show a blank.
+    ottakkal:{
+      areaId:'ottakkal', name:null, designation:'District Collector · CPOC (post vacant)',
+      department:'Kanara State Disaster Management Authority', jurisdiction:'Ottakkal District EOC · Plateau',
+      assignedAtMin: null, updatedAtMin: 41, heartbeat:'2m 41s', online:false, link:'Cellular',
+      deputy:{ name:'S. Nazreen', designation:'ADM · Acting CPOC', phone:'+91 94470 77416' },
+      channels:[
+        { kind:'phone', value:'+91 94470 77416', label:'Acting CPOC line', available:true },
+        { kind:'email', value:'cpoc.ottakkal@kanara.gov.in', label:'District EOC mail', available:true },
+        { kind:'net',   value:'OTK-1', label:'District net (in-app)', available:false },
+        { kind:'radio', value:'VHF 149.650 · Net OTK-1', label:'Radio', available:true }
+      ]
+    }
+    // poovathur: intentionally ABSENT — a NORMAL district with no CPOC designated.
+    // GET /areas/poovathur/cpoc returns 404 and the UI shows "Not yet assigned".
+  }
+};
+
+/* ============================================================
+   DATA ACCESS — stands in for the API layer
+   ------------------------------------------------------------
+   Everything the UI reads goes through here. Latency and failure
+   are simulated so the loading and error states are real code
+   paths, not decorations. Toggle them from the account menu.
+   ============================================================ */
+const NET = { latency: 240, failCpoc: false };
+const _cpocCache = new Map();
+
+const api = {
+  /** GET /incidents — assignments are inlined, so the list never fetches per card. */
+  listIncidents(){ return INCIDENTS; },
+
+  /** GET /areas/:areaId/cpoc — cached per area; null models a 404. */
+  getCpoc(areaId){
+    if (_cpocCache.has(areaId)) return Promise.resolve(_cpocCache.get(areaId));
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (NET.failCpoc) return reject(new Error('CPOC_LOOKUP_FAILED'));
+        const rec = SEED.cpoc[areaId] || null;
+        _cpocCache.set(areaId, rec);
+        resolve(rec);
+      }, NET.latency);
+    });
+  },
+
+  /** Drop a cached record so a handover or reassignment can never serve a stale CPOC. */
+  invalidateCpoc(areaId){
+    if (areaId) _cpocCache.delete(areaId); else _cpocCache.clear();
+  },
+
+  /** Succession per M1: deputy assumes the role, record is rewritten, cache dropped. */
+  promoteDeputy(areaId){
+    const rec = SEED.cpoc[areaId];
+    if (!rec || !rec.deputy) return null;
+    const dep = rec.deputy;
+    SEED.cpoc[areaId] = Object.assign({}, rec, {
+      name: dep.name,
+      designation: dep.designation.replace('Deputy CPOC','CPOC (acting)').replace('Acting CPOC','CPOC (acting)'),
+      assignedAtMin: 0, updatedAtMin: 0, online: true, heartbeat: '2s',
+      deputy: { name:'— vacant —', designation:'Deputy CPOC · to be designated', phone:null },
+      channels: rec.channels.map(c => c.kind === 'phone' ? Object.assign({}, c, { value: dep.phone, label:'Acting CPOC line', available: !!dep.phone }) : c)
+    });
+    api.invalidateCpoc(areaId);
+    return SEED.cpoc[areaId];
+  },
+
+  /** Re-task the agencies on an issue. Returns the new assignment list. */
+  reassign(incidentId, assignments){
+    const i = INCIDENTS.find(x => x.id === incidentId);
+    if (!i) return null;
+    i.assignments = assignments;
+    i.status = assignments.length ? (i.status === 'REPORTED' || i.status === 'TRIAGED' ? 'ASSIGNED' : i.status) : 'TRIAGED';
+    return i.assignments;
+  }
+};
+
+/* Append-only activity trail — a stub for M11 (Audit & Accountability).
+   Real M11 entries carry actor, role, area, original vs synced timestamp. */
+const AUDIT = [];
+function logEvent(incidentId, action, detail){
+  AUDIT.push({ incidentId, action, detail, at: Date.now(), actor:'D. Krishnankutty', role:'State Controller' });
+}
+function auditFor(incidentId){ return AUDIT.filter(e => e.incidentId === incidentId).slice(-3).reverse(); }
+
+const PHOTOS = {
+  karippodu:[
+    { scene:'collapse', t:'20 Aug 2026 · 14:32:11 IST', ll:'11.86420° N, 75.37114° E', acc:'±6 m', unit:'NDRF-11', agency:'NDRF', inc:'INC-2041', hash:'a91f2c…7d3c', note:'Initial report — north face, 6 voids marked' },
+    { scene:'collapse', t:'20 Aug 2026 · 15:04:47 IST', ll:'11.86438° N, 75.37102° E', acc:'±4 m', unit:'NDRF-11', agency:'NDRF', inc:'INC-2041', hash:'5b7e10…22af', note:'Cutting access opened at slab 2' },
+    { scene:'fire',     t:'20 Aug 2026 · 13:18:02 IST', ll:'11.83091° N, 75.34020° E', acc:'±8 m', unit:'FIRE-04', agency:'FIRE', inc:'INC-2033', hash:'c40dd8…9e51', note:'Transformer yard, wind pushing east' },
+    { scene:'flood',    t:'20 Aug 2026 · 11:55:30 IST', ll:'11.84702° N, 75.40655° E', acc:'±5 m', unit:'FIRE-09', agency:'FIRE', inc:'INC-2022', hash:'71aa93…04bd', note:'Perimeter road, bottling unit gate 3' },
+    { scene:'night',    t:'20 Aug 2026 · 04:12:55 IST', ll:'11.84690° N, 75.40602° E', acc:'±9 m', unit:'FIRE-09', agency:'FIRE', inc:'INC-2022', hash:'0fe6b1…8c20', note:'Night cordon, gas detector reading logged' },
+    { scene:'camp',     t:'20 Aug 2026 · 09:40:19 IST', ll:'11.85510° N, 75.35880° E', acc:'±7 m', unit:'POL-04',  agency:'POLICE', inc:'—',      hash:'e2c775…16fa', note:'Camp 7 intake — 412 registered' }
+  ],
+  vellamunda:[
+    { scene:'flood', t:'20 Aug 2026 · 13:47:20 IST', ll:'12.01840° N, 75.29073° E', acc:'±5 m', unit:'SDRF-02', agency:'SDRF', inc:'INC-2038', hash:'8d3a41…b709', note:'Rooftops, Cheruvatta colony — 11 visible' },
+    { scene:'flood', t:'20 Aug 2026 · 14:19:58 IST', ll:'12.01822° N, 75.29110° E', acc:'±6 m', unit:'SDRF-02', agency:'SDRF', inc:'INC-2038', hash:'2fb096…c31e', note:'Boat 1 approach lane, current 2.1 m/s' },
+    { scene:'road',  t:'20 Aug 2026 · 12:02:41 IST', ll:'12.06201° N, 75.33551° E', acc:'±4 m', unit:'MED-05',  agency:'MEDICAL', inc:'INC-2030', hash:'ba5517…7702', note:'PHC approach submerged, 0.9 m depth' },
+    { scene:'camp',  t:'20 Aug 2026 · 10:26:03 IST', ll:'12.00915° N, 75.31240° E', acc:'±7 m', unit:'SDRF-02', agency:'SDRF', inc:'—', hash:'44c9ee…d158', note:'Camp 2 — 268 registered, 3 medical needs' },
+    { scene:'night', t:'20 Aug 2026 · 03:58:14 IST', ll:'12.01799° N, 75.29201° E', acc:'±11 m', unit:'SDRF-02', agency:'SDRF', inc:'INC-2038', hash:'9917ac…3f4d', note:'Night sweep, thermal contact at block C' }
+  ],
+  thodupara:[
+    { scene:'road',      t:'20 Aug 2026 · 15:22:36 IST', ll:'11.71880° N, 75.88941° E', acc:'±5 m', unit:'POL-17', agency:'POLICE', inc:'INC-2044', hash:'6ad230…91cc', note:'Debris face across bypass, 40 m wide' },
+    { scene:'collapse',  t:'20 Aug 2026 · 15:31:09 IST', ll:'11.71905° N, 75.88902° E', acc:'±6 m', unit:'POL-17', agency:'POLICE', inc:'INC-2044', hash:'ff0821…5ab3', note:'Two vehicles partially buried, tail visible' },
+    { scene:'road',      t:'20 Aug 2026 · 12:41:52 IST', ll:'11.70020° N, 75.92150° E', acc:'±4 m', unit:'POL-17', agency:'POLICE', inc:'INC-2027', hash:'31de77…0b64', note:'Bridge approach scour, closure barricaded' },
+    { scene:'night',     t:'20 Aug 2026 · 05:44:31 IST', ll:'11.74110° N, 75.86205° E', acc:'±9 m', unit:'POL-17', agency:'POLICE', inc:'INC-2049', hash:'7c40b9…ee12', note:'Hamlet track blocked — foot recce only' }
+  ],
+  chandragiri:[
+    { scene:'camp', t:'20 Aug 2026 · 08:14:07 IST', ll:'12.04480° N, 75.61200° E', acc:'±6 m', unit:'SDRF-07', agency:'SDRF', inc:'INC-2018', hash:'aa19f4…c8d0', note:'Camp 3 stores — bedding shortfall' },
+    { scene:'camp', t:'20 Aug 2026 · 08:20:44 IST', ll:'12.04471° N, 75.61188° E', acc:'±5 m', unit:'SDRF-07', agency:'SDRF', inc:'INC-2018', hash:'5e8b23…41a7', note:'Occupancy board — 189 of 250' }
+  ],
+  nedumbara:[
+    { scene:'flood', t:'20 Aug 2026 · 09:58:12 IST', ll:'11.86200° N, 75.55880° E', acc:'±5 m', unit:'SDRF-07', agency:'SDRF', inc:'INC-2015', hash:'d10c65…9b2e', note:'Closure evidence — Ward 4 drained' }
+  ],
+  ottakkal:[], manalvayal:[], kanjirode:[], poovathur:[]
+};
+
+/* ============================================================
+   STATE + HELPERS
+   ============================================================ */
+const $  = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const AGENCIES = ['NDRF','SDRF','FIRE','POLICE','MEDICAL'];
+const T0 = Date.now();
+
+const S = {
+  sev:new Set([0,1,2,3]), type:'', status:'', agency:'',
+  district:null, incident:null,
+  leadH:18.70,
+  k:1, tx:0, ty:0,
+  photoSet:[], photoIdx:0, photoDistrict:null
+};
+INCIDENTS.forEach(i => i.created = T0 - i.ageMin*60000);
+
+const dist = id => DISTRICTS.find(d => d.id === id);
+const inc  = id => INCIDENTS.find(i => i.id === id);
+const ageMinOf = i => Math.floor((Date.now() - i.created)/60000);
+const isOpen = i => i.status !== 'CLOSED';
+const isOverdue = i => ageMinOf(i) > SEV_TARGET_MIN[i.sev];
+
+function fmtAge(m){
+  if (m < 60) return m + 'm';
+  const h = Math.floor(m/60), mm = m%60;
+  return h + 'h ' + String(mm).padStart(2,'0') + 'm';
+}
+function fmtElapsedH(h){
+  const total = Math.floor(h*60);
+  return Math.floor(total/60) + 'h ' + String(total%60).padStart(2,'0') + 'm';
+}
+function tone(h){ return h < 6 ? 'green' : h < 20 ? 'amber' : 'red'; }
+function toast(msg, ms){
+  $('#toastMsg').textContent = msg;
+  const t = $('#toast'); t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(()=>t.classList.remove('show'), ms || 3200);
+}
+function glyphSVG(type, cls){
+  return '<svg viewBox="0 0 24 24" class="'+(cls||'')+'"><path d="'+TYPES[type].d+'"/></svg>';
+}
+
+/* ============================================================
+   MAP — render
+   ============================================================ */
+const map = $('#map'), vp = $('#viewport');
+const gGlow = $('#glow'), gDist = $('#districts'), gLab = $('#dlabels'),
+      gUnit = $('#units'), gInc = $('#incidents');
+const NS = 'http://www.w3.org/2000/svg';
+const el = (n, attrs) => { const e = document.createElementNS(NS, n); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+
+function renderDistricts(){
+  gGlow.innerHTML = ''; gDist.innerHTML = ''; gLab.innerHTML = '';
+  DISTRICTS.forEach(d => {
+    if (d.state === 'EMERGENCY'){
+      gGlow.appendChild(el('ellipse',{cx:d.cx, cy:d.cy, rx:120, ry:88, class:'glow-em', filter:'url(#soft)'}));
+    }
+    const sel = S.district === d.id;
+    const p = el('path',{
+      d:d.path, 'data-district':d.id,
+      class:'district d-' + d.state + (sel ? ' sel' : '')
+    });
+    gDist.appendChild(p);
+
+    const t = el('text',{x:d.cx, y:d.cy, class:'dlabel' + (d.state==='NORMAL'?' dim':''), 'text-anchor':'middle'});
+    t.textContent = d.name.toUpperCase();
+    gLab.appendChild(t);
+
+    const sub = el('text',{x:d.cx, y:d.cy+15, class:'dsub', 'text-anchor':'middle', 'data-sub':d.id});
+    sub.textContent = subLabel(d);
+    if (d.state === 'EMERGENCY') sub.classList.add('em');
+    else if (d.state === 'ALERT') sub.classList.add('al');
+    gLab.appendChild(sub);
+  });
+}
+function subLabel(d){
+  const n = INCIDENTS.filter(i => i.district === d.id && isOpen(i)).length;
+  if (d.state === 'NORMAL') return n ? n + ' OPEN' : 'NORMAL';
+  const h = d.id === 'karippodu' ? S.leadH : d.sinceH;
+  return h ? d.state + ' · ' + fmtElapsedH(h) : d.state;
+}
+function refreshSubLabels(){
+  DISTRICTS.forEach(d => {
+    const n = gLab.querySelector('[data-sub="'+d.id+'"]');
+    if (n) n.textContent = subLabel(d);
+  });
+}
+
+function renderUnits(){
+  gUnit.innerHTML = '';
+  UNITS.forEach(u => {
+    const g = el('g',{class:'marker', 'data-unit':u.id, 'data-x':u.x, 'data-y':u.y, tabindex:'0',
+                      role:'button', 'aria-label':'Unit '+u.label+', '+u.state});
+    g.appendChild(el('path',{d:'M-5 10 L5 10 L0 15 Z', class:'unit-tip'}));
+    g.appendChild(el('rect',{x:-21, y:-10, width:42, height:20, rx:5, class:'unit-body'}));
+    const t = el('text',{x:0, y:4, class:'unit-txt','text-anchor':'middle'});
+    t.textContent = u.label; g.appendChild(t);
+    const dotCls = u.state === 'ENGAGED' ? 'engaged' : u.state === 'EN_ROUTE' ? 'enroute' : 'avail';
+    g.appendChild(el('circle',{cx:19, cy:-10, r:3.4, class:'unit-dot ' + dotCls}));
+    g.appendChild(el('circle',{class:'hit', cx:0, cy:0, r:22}));
+    g.addEventListener('click', e => { e.stopPropagation(); onUnitClick(u); });
+    gUnit.appendChild(g);
+  });
+}
+
+function renderIncidents(){
+  gInc.innerHTML = '';
+  const list = filtered();
+  const visible = new Set(list.map(i => i.id));
+  INCIDENTS.forEach(i => {
+    const dim = !visible.has(i.id);
+    const sel = S.incident === i.id;
+    const g = el('g',{class:'marker', 'data-inc':i.id, 'data-x':i.x, 'data-y':i.y, tabindex:'0',
+                      role:'button', 'aria-label':i.id+' '+TYPES[i.type].label+' P'+i.sev, opacity: dim ? .22 : 1});
+    if (sel) g.appendChild(el('circle',{class:'sel-ring', cx:0, cy:0, r:20}));
+    if (i.sev === 0 && isOverdue(i) && !dim)
+      g.appendChild(el('circle',{class:'ping', cx:0, cy:0, r:11}));
+
+    const st = STATUS[i.status];
+    const ring = el('circle',{cx:0, cy:0, r:15, class:'ring' + (st.ring === 'white' ? ' strong' : '')});
+    if (st.ring === 'dash') ring.setAttribute('stroke-dasharray','3.2 3.2');
+    g.appendChild(ring);
+
+    g.appendChild(el('circle',{cx:0, cy:0, r:11, class:'mk-dot s' + i.sev}));
+    const gi = el('g',{transform:'translate(-7.4,-7.4) scale(0.617)'});
+    gi.appendChild(el('path',{class:'glyph', d:TYPES[i.type].d}));
+    g.appendChild(gi);
+    if (i.reports > 1){
+      g.appendChild(el('circle',{cx:12, cy:-12, r:6.4, class:'count-bub'}));
+      const rt = el('text',{x:12, y:-9.4, 'text-anchor':'middle', class:'count-txt'});
+      rt.textContent = i.reports; g.appendChild(rt);
+    }
+    g.appendChild(el('circle',{class:'hit', cx:0, cy:0, r:19}));
+    g.addEventListener('click', e => { e.stopPropagation(); selectIncident(i.id, 'map'); });
+    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectIncident(i.id,'map'); } });
+    gInc.appendChild(g);
+  });
+  scaleMarkers();
+}
+
+/* ---------- zoom / pan ---------- */
+function scaleMarkers(){
+  const inv = 1/S.k;
+  gInc.querySelectorAll('.marker').forEach(m => {
+    m.setAttribute('transform','translate('+m.dataset.x+','+m.dataset.y+') scale('+inv+')');
+  });
+  gUnit.querySelectorAll('.marker').forEach(m => {
+    m.setAttribute('transform','translate('+m.dataset.x+','+m.dataset.y+') scale('+inv+')');
+  });
+  gLab.querySelectorAll('text').forEach(t => {
+    t.setAttribute('font-size', (t.classList.contains('dsub') ? 8.5 : 11) / S.k + 'px');
+  });
+}
+function applyView(){
+  vp.setAttribute('transform','translate('+S.tx+','+S.ty+') scale('+S.k+')');
+  scaleMarkers(); updateCoords(); positionCallout();
+}
+function svgPoint(evt){
+  if (typeof map.getScreenCTM !== 'function' || typeof window.DOMPoint !== 'function')
+    return { x:0, y:0 };
+  const ctm = map.getScreenCTM();
+  if (!ctm) return { x:0, y:0 };
+  return new DOMPoint(evt.clientX, evt.clientY).matrixTransform(ctm.inverse());
+}
+function zoomAt(px, py, factor){
+  const nk = Math.min(6, Math.max(.65, S.k * factor));
+  const f = nk / S.k;
+  S.tx = px - (px - S.tx) * f;
+  S.ty = py - (py - S.ty) * f;
+  S.k = nk;
+  applyView();
+}
+map.addEventListener('wheel', e => {
+  e.preventDefault();
+  const p = svgPoint(e);
+  zoomAt(p.x, p.y, e.deltaY < 0 ? 1.16 : 1/1.16);
+}, {passive:false});
+
+/* Drag-pan. No pointer capture: capture would retarget click events to the
+   <svg> root and swallow every marker / district click. */
+let drag = null, swallowClick = false;
+map.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  drag = { x:e.clientX, y:e.clientY, p:svgPoint(e), moved:0 };
+});
+map.addEventListener('pointermove', e => { if (!drag) updateCoords(svgPoint(e)); });
+window.addEventListener('pointermove', e => {
+  if (!drag) return;
+  drag.moved += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y);
+  if (drag.moved > 3) map.classList.add('dragging');
+  const p = svgPoint(e);
+  S.tx += p.x - drag.p.x;          // viewBox-space delta maps 1:1 onto translate
+  S.ty += p.y - drag.p.y;
+  drag.x = e.clientX; drag.y = e.clientY; drag.p = svgPoint(e);
+  applyView();
+});
+window.addEventListener('pointerup', () => {
+  if (drag && drag.moved > 4) swallowClick = true;
+  drag = null; map.classList.remove('dragging');
+});
+map.addEventListener('click', e => {
+  if (swallowClick){ swallowClick = false; return; }
+  if (e.target.closest('.marker')) return;              // markers handle their own
+  const t = e.target.closest('[data-district]');
+  if (t) selectDistrict(t.dataset.district);
+  else { clearSelection(); renderIncidents(); renderList(); renderCallout(); }
+});
+$('#zoomIn').onclick  = () => zoomAt(500,360,1.3);
+$('#zoomOut').onclick = () => zoomAt(500,360,1/1.3);
+$('#zoomReset').onclick = () => { S.k=1; S.tx=0; S.ty=0; applyView(); };
+
+function updateCoords(p){
+  // root user space -> content space -> fictional lat/lng for the corner readout
+  const cx = ((p ? p.x : 500) - S.tx) / S.k;
+  const cy = ((p ? p.y : 360) - S.ty) / S.k;
+  const lat = (12.14 - (cy / 720) * 0.62).toFixed(4);
+  const lng = (75.18 + (cx / 1000) * 0.86).toFixed(4);
+  $('#mapCoords').textContent = lat + '° N · ' + lng + '° E · zoom ' + S.k.toFixed(1) + '×';
+}
+
+/* ============================================================
+   FILTERS + LIST
+   ============================================================ */
+function filtered(){
+  return INCIDENTS.filter(i =>
+    S.sev.has(i.sev) &&
+    (!S.type || i.type === S.type) &&
+    (!S.status || i.status === S.status) &&
+    (!S.agency || agenciesOf(i).includes(S.agency)) &&
+    (!S.district || i.district === S.district)
+  ).sort((a,b) => a.sev - b.sev || ageMinOf(b) - ageMinOf(a));
+}
+
+function renderList(){
+  const list = filtered(), box = $('#list');
+  $('#listCount').textContent = list.length + ' / ' + INCIDENTS.length;
+  $('#railCount').textContent = list.length;
+  box.innerHTML = '';
+  if (!list.length){
+    box.innerHTML = '<div class="empty">No issues match these filters.<br>Clear one to widen the view.</div>';
+    return;
+  }
+  list.forEach(i => {
+    const d = dist(i.district), age = ageMinOf(i), over = isOverdue(i), sel = S.incident === i.id;
+    const row = document.createElement('div');
+    row.className = 'row' + (sel ? ' sel' : '');
+    row.dataset.id = i.id; row.setAttribute('role','option'); row.title = i.title + ' — ' + d.name;
+    row.setAttribute('aria-selected', sel ? 'true' : 'false'); row.tabIndex = 0;
+    row.innerHTML =
+      '<span class="sev sev'+i.sev+'">P'+i.sev+'</span>' +
+      '<span class="tico">'+glyphSVG(i.type)+'</span>' +
+      '<span style="display:block;min-width:0">' +
+        '<span class="rtitle">'+i.title+'</span>' +
+        '<span class="rmeta">'+d.name+'<span class="sep">·</span>' +
+          '<span class="age'+(over?' over':'')+'">'+fmtAge(age)+(over?' ⚑':'')+'</span>' +
+          '<span class="sep">·</span><span class="'+STATUS[i.status].cls+'" style="display:inline-flex;align-items:center;gap:4px"><span class="stat-dot"></span>'+STATUS[i.status].label+'</span></span>' +
+      '</span>' +
+      agencyCell(i);
+    row.addEventListener('click', () => selectIncident(i.id, 'list'));
+    row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectIncident(i.id,'list'); } });
+    box.appendChild(row);
+
+    if (sel){
+      const det = document.createElement('div');
+      det.className = 'detail';
+      det.innerHTML =
+        '<div class="kv"><span>Incident</span><b>'+i.id+'</b></div>' +
+        '<div class="kv"><span>Type</span><b>'+TYPES[i.type].label+'</b></div>' +
+        '<div class="kv"><span>Coordinates</span><b>'+i.ll+'</b></div>' +
+        '<div class="kv"><span>Reported</span><b>'+fmtAge(age)+' ago</b></div>' +
+        '<div class="kv"><span>Target response</span><b>'+(i.sev===0?'Immediate':i.sev===1?'Within 6h':i.sev===2?'Same day':'Post-rescue')+'</b></div>' +
+        '<div class="kv"><span>Provenance</span><b>'+i.reports+' report'+(i.reports>1?'s':'')+(i.reportingAgencies>1?' · '+i.reportingAgencies+' agencies':'')+'</b></div>' +
+        '<div class="kv"><span>Source</span><span class="src'+(i.src.startsWith('CIVILIAN')?' civ':'')+'">'+i.src.replace('_',' · ')+'</span></div>' +
+
+        '<div class="sec"><div class="sec-hd"><span class="lbl">Assigned agencies</span>' +
+          '<span class="tag">'+(i.assignments.length ? i.assignments.length+' tasked' : 'none')+'</span></div>' +
+          assignBlock(i) + '</div>' +
+
+        '<div class="sec"><div class="sec-hd"><span class="lbl">CPOC · '+d.name+'</span>' +
+          '<span class="tag">area commander</span></div>' +
+          '<div data-cpoc aria-live="polite"></div></div>' +
+
+        '<div class="sec'+(trailInner(i.id)?'':' hidden')+'" data-trail="'+i.id+'">'+trailInner(i.id)+'</div>' +
+
+        '<div class="acts">' +
+          '<button class="btn primary contact" data-act="contact" disabled aria-label="Contact the CPOC for '+d.name+' about '+i.id+'">' +
+            '<svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>' +
+            'Contact CPOC</button>' +
+          '<button class="btn sm" data-act="focus">Centre on map</button>' +
+          '<button class="btn sm" data-act="photos">Evidence ('+i.photos+')</button>' +
+          '<button class="btn sm" data-act="assign">'+(i.assignments.length?'Re-assign':'Assign unit')+'</button>' +
+        '</div>';
+      det.querySelector('[data-act="focus"]').onclick = () => focusIncident(i);
+      det.querySelector('[data-act="photos"]').onclick = () => openGallery(i.district, i.id);
+      det.querySelector('[data-act="assign"]').onclick = () => reassignIncident(i);
+      box.appendChild(det);
+      renderCpocBlock(det.querySelector('[data-cpoc]'), det.querySelector('[data-act="contact"]'), i);
+    }
+  });
+}
+
+/* ============================================================
+   SELECTION
+   ============================================================ */
+function selectIncident(id, from){
+  S.incident = (S.incident === id) ? null : id;
+  renderIncidents(); renderList(); renderCallout();
+  if (S.incident && from === 'map'){
+    const row = $('#list [data-id="'+S.incident+'"]');
+    if (row && row.scrollIntoView) row.scrollIntoView({block:'nearest', behavior:'smooth'});
+    if ($('#main').classList.contains('collapsed')) setCollapsed(false);
+  }
+  if (S.incident && from === 'list'){
+    const i = inc(S.incident);
+    const d = dist(i.district);
+    if (S.district && S.district !== i.district) { /* keep filter */ }
+    flashMarker(i.id);
+  }
+}
+function flashMarker(id){
+  const m = gInc.querySelector('[data-inc="'+id+'"]');
+  if (!m) return;
+  const c = el('circle',{class:'ping flash', cx:0, cy:0, r:11});
+  m.appendChild(c); setTimeout(()=>c.remove(), 2100);
+}
+function focusIncident(i){
+  S.k = 2.4;
+  S.tx = 500 - i.x * S.k;
+  S.ty = 360 - i.y * S.k;
+  applyView(); flashMarker(i.id);
+}
+function clearSelection(){
+  S.incident = null; setDistrict(null);
+}
+function selectDistrict(id){
+  setDistrict(S.district === id ? null : id);
+}
+function setDistrict(id){
+  S.district = id;
+  renderDistricts(); renderIncidents(); renderList(); renderCallout();
+  const card = $('#dcard');
+  if (!id){ card.classList.add('hidden'); $('#dfilterRow').classList.add('hidden'); return; }
+  const d = dist(id);
+  $('#dfilterRow').classList.remove('hidden');
+  $('#dfilterName').textContent = d.name;
+  const open = INCIDENTS.filter(i => i.district === id && isOpen(i));
+  const bySev = [0,1,2,3].map(s => open.filter(i => i.sev === s).length);
+  const units = UNITS.filter(u => u.district === id);
+  $('#dcName').textContent = d.name;
+  $('#dcProfile').textContent = d.profile;
+  const pill = $('#dcState');
+  pill.textContent = d.state; pill.className = 'state-pill dstate-' + d.state;
+  $('#dcStats').innerHTML = [0,1,2,3].map(s =>
+    '<div class="dstat"><div class="n'+(bySev[s]?' fg-s'+s:'')+'">'+bySev[s]+'</div><div class="l">P'+s+'</div></div>'
+  ).join('');
+  const sinceH = id === 'karippodu' ? S.leadH : d.sinceH;
+  $('#dcMeta').innerHTML =
+    '<div><span>Hazard</span><b>'+d.hazard+'</b></div>' +
+    '<div><span>In state</span><b>'+(sinceH ? fmtElapsedH(sinceH) : '—')+'</b></div>' +
+    '<div><span>Units</span><b>'+units.length+' deployed'+(units.length?' · '+units.map(u=>u.label).join(', '):'')+'</b></div>' +
+    '<div><span>Camps</span><b>'+(d.camps || '—')+(d.camps?' open':'')+'</b></div>' +
+    '<div><span>CPOC</span><b id="dcCpocVal"><span class="sk" style="display:inline-block;width:110px;height:11px"></span></b></div>';
+  $('#photoCount').textContent = '(' + (PHOTOS[id] ? PHOTOS[id].length : 0) + ')';
+  card.classList.remove('hidden');
+  loadDistrictCpoc(id, d);
+}
+let _dcReq = 0;
+function loadDistrictCpoc(id, d){
+  const req = ++_dcReq, btn = $('#btnCpoc');
+  btn.disabled = true; btn.setAttribute('aria-busy','true');
+  api.getCpoc(id).then(rec => {
+    if (req !== _dcReq) return;                     // a newer district won
+    const v = $('#dcCpocVal'); if (!v) return;
+    btn.removeAttribute('aria-busy');
+    if (!rec){
+      v.innerHTML = '<span style="color:var(--text-3)">Not yet assigned</span>';
+      btn.disabled = true;
+      btn.title = 'No CPOC is designated for ' + d.name;
+      return;
+    }
+    const acting = !rec.name;
+    const who = (rec.name || rec.deputy.name).split(',')[0] + (acting ? ' (acting)' : '');
+    v.innerHTML = who + ' · <span style="color:' + (rec.online ? 'var(--st-resolved)' : 'var(--st-rejected)') +
+      '">hb ' + rec.heartbeat + '</span>';
+    btn.disabled = false;
+    btn.title = 'Contact ' + who;
+  }).catch(() => {
+    if (req !== _dcReq) return;
+    const v = $('#dcCpocVal');
+    if (v) v.innerHTML = '<span style="color:var(--p0-fg)">Lookup failed</span>';
+    btn.disabled = true; btn.removeAttribute('aria-busy'); btn.title = 'CPOC lookup failed';
+  });
+}
+
+/* Re-tasking. The area — and therefore the CPOC — does not change, so the
+   cached record stays valid; a handover is what invalidates it. */
+const REASSIGN_UNIT = { NDRF:'NDRF-11', SDRF:'SDRF-02', FIRE:'FIRE-04', POLICE:'POL-17', MEDICAL:'MED-05' };
+function reassignIncident(i){
+  const order = ['NDRF','SDRF','FIRE','POLICE','MEDICAL'];
+  const cur = leadOf(i);
+  const next = order[(order.indexOf(cur ? cur.agency : 'MEDICAL') + 1) % order.length];
+  const kept = (i.assignments || []).filter(a => a.role === 'supporting' && a.agency !== next);
+  api.reassign(i.id, [{ agency:next, unit:REASSIGN_UNIT[next], role:'lead', agoMin:0 }].concat(kept));
+  logEvent(i.id, 'REASSIGN', 'Lead re-tasked to ' + REASSIGN_UNIT[next]);
+  renderList(); renderIncidents(); renderCallout(); renderSevRow();
+  toast(i.id + ' re-tasked — ' + REASSIGN_UNIT[next] + ' is now lead agency.');
+}
+
+function onUnitClick(u){
+  toast(u.label + ' · ' + u.agency + ' — ' + u.state.replace('_',' ').toLowerCase() + ' · ' + u.note + (u.task ? ' · on ' + u.task : ''));
+}
+
+/* ============================================================
+   MAP CALLOUT
+   ============================================================ */
+function renderCallout(){
+  const box = $('#callout');
+  if (!S.incident){ box.classList.add('hidden'); return; }
+  const i = inc(S.incident), d = dist(i.district), age = ageMinOf(i), over = isOverdue(i);
+  box.innerHTML =
+    '<div class="top">' +
+      '<span class="sev sev'+i.sev+'" style="padding:3px 6px">P'+i.sev+'</span>' +
+      '<span style="font-size:11.5px;font-weight:650">'+TYPES[i.type].label+'</span>' +
+      '<span class="id mono">'+i.id+'</span>' +
+    '</div>' +
+    '<h4>'+i.title+'</h4>' +
+    '<div class="kv"><span>District</span><b>'+d.name+'</b></div>' +
+    '<div class="kv"><span>Status</span><b>'+STATUS[i.status].label+'</b></div>' +
+    '<div class="kv"><span>Age</span><b style="color:'+(over?'var(--p1-fg)':'inherit')+'">'+fmtAge(age)+(over?' · past target':'')+'</b></div>' +
+    '<div class="kv"><span>Assigned</span><b>'+(leadOf(i)
+        ? (leadOf(i).unit || AGENCY_LABEL[leadOf(i).agency]) + (i.assignments.length > 1 ? ' +' + (i.assignments.length-1) : '')
+        : 'not yet assigned')+'</b></div>' +
+    '<div class="kv"><span>Reports</span><b>'+i.reports+(i.reportingAgencies>1?' · '+i.reportingAgencies+' agencies':'')+'</b></div>' +
+    '<div style="display:flex;gap:6px;margin-top:9px">' +
+      '<button class="btn sm" id="coFocus" style="flex:1">Zoom to</button>' +
+      '<button class="btn sm" id="coDist" style="flex:1">Open district</button>' +
+    '</div>';
+  box.classList.remove('hidden');
+  $('#coFocus').onclick = e => { e.stopPropagation(); focusIncident(i); };
+  $('#coDist').onclick  = e => { e.stopPropagation(); setDistrict(i.district); };
+  positionCallout();
+}
+function positionCallout(){
+  const box = $('#callout');
+  if (!S.incident || box.classList.contains('hidden')) return;
+  const i = inc(S.incident);
+  if (typeof vp.getScreenCTM !== 'function' || typeof window.DOMPoint !== 'function') return;
+  const ctm = vp.getScreenCTM();
+  if (!ctm) return;
+  const p = new DOMPoint(i.x, i.y).matrixTransform(ctm);
+  const wrap = $('#mapwrap').getBoundingClientRect();
+  const w = 250, h = box.offsetHeight || 210;
+  let left = p.x - wrap.left + 26, top = p.y - wrap.top - h/2;
+  if (left + w > wrap.width - 10) left = p.x - wrap.left - w - 26;
+  left = Math.max(10, Math.min(left, wrap.width - w - 10));
+  top  = Math.max(10, Math.min(top,  wrap.height - h - 10));
+  if (!$('#dcard').classList.contains('hidden') && left < 340 && top < 300) left = 340;
+  box.style.left = left + 'px'; box.style.top = top + 'px'; box.style.right = 'auto'; box.style.bottom = 'auto';
+}
+window.addEventListener('resize', positionCallout);
+
+/* ============================================================
+   FILTER UI
+   ============================================================ */
+function buildFilters(){
+  const chips = $('#sevChips');
+  [0,1,2,3].forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.sev = s;
+    b.setAttribute('aria-pressed','true');
+    b.setAttribute('aria-label','Severity P'+s+' filter');
+    b.innerHTML = '<i class="bg-s'+s+'"></i>P'+s;
+    b.onclick = () => {
+      S.sev.has(s) ? S.sev.delete(s) : S.sev.add(s);
+      if (!S.sev.size) S.sev = new Set([0,1,2,3]);
+      syncChips(); renderIncidents(); renderList();
+    };
+    chips.appendChild(b);
+  });
+  const types = [...new Set(INCIDENTS.map(i => i.type))];
+  types.forEach(t => $('#fType').add(new Option(TYPES[t].label, t)));
+  ['REPORTED','TRIAGED','ASSIGNED','IN_PROGRESS','RESOLVED'].forEach(s => $('#fStatus').add(new Option(STATUS[s].label, s)));
+  AGENCIES.forEach(a => $('#fAgency').add(new Option(a === 'FIRE' ? 'Fire Force' : a === 'MEDICAL' ? 'Medical' : a === 'POLICE' ? 'Police' : a, a)));
+
+  $('#fType').onchange   = e => { S.type = e.target.value;   renderIncidents(); renderList(); };
+  $('#fStatus').onchange = e => { S.status = e.target.value; renderIncidents(); renderList(); };
+  $('#fAgency').onchange = e => { S.agency = e.target.value; renderIncidents(); renderList(); };
+  $('#clearFilters').onclick = () => {
+    S.sev = new Set([0,1,2,3]); S.type = S.status = S.agency = '';
+    $('#fType').value = $('#fStatus').value = $('#fAgency').value = '';
+    syncChips(); setDistrict(null);
+  };
+  $('#dfilterClear').onclick = () => setDistrict(null);
+}
+function syncChips(){
+  $$('#sevChips .chip').forEach(c => c.setAttribute('aria-pressed', String(S.sev.has(+c.dataset.sev))));
+}
+
+/* panel collapse */
+function setCollapsed(v){
+  $('#main').classList.toggle('collapsed', v);
+  setTimeout(positionCallout, 30);
+}
+$('#panelCollapse').onclick = () => setCollapsed(true);
+$('#railExpand').onclick    = () => setCollapsed(false);
+
+/* ============================================================
+   CLOCK + ELAPSED
+   ============================================================ */
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const pad = n => String(n).padStart(2,'0');
+
+function tick(){
+  const now = new Date();
+  $('#clkTime').innerHTML = pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+'<span class="tz">IST</span>';
+  $('#clkDate').textContent = DAYS[now.getDay()]+' '+now.getDate()+' '+MONS[now.getMonth()]+' '+now.getFullYear();
+
+  const h = S.leadH + (Date.now() - T0)/3600000;
+  const v = $('#elapsedVal'), tn = tone(h);
+  v.textContent = fmtElapsedH(h);
+  v.className = 'mono t-' + tn;
+  const bar = $('#elapsedBar');
+  bar.style.width = Math.min(100, h/24*100) + '%';
+  bar.style.background = tn === 'green' ? 'var(--p3)' : tn === 'amber' ? 'var(--p1)' : 'var(--p0)';
+  const left = 24 - h;
+  $('#protoNote').textContent = left > 0
+    ? 'recovery-protocol review in ' + fmtElapsedH(left)
+    : 'past 24h — recovery protocol overdue';
+
+  const em = DISTRICTS.filter(d => d.state === 'EMERGENCY');
+  $('#counterTxt').textContent = em.length + ' districts active';
+  $('#districtCounter').classList.toggle('hidden', em.length < 2);
+  refreshSubLabels();
+}
+function buildDistrictPop(){
+  const em = DISTRICTS.filter(d => d.state === 'EMERGENCY');
+  $('#districtPopList').innerHTML = em.map(d => {
+    const hh = d.id === 'karippodu' ? S.leadH : d.sinceH;
+    const n = INCIDENTS.filter(i => i.district === d.id && isOpen(i)).length;
+    return '<button data-d="'+d.id+'"><span class="sq"></span><span><b style="font-weight:650">'+d.name+'</b>' +
+           '<span style="display:block;font-size:10.5px;color:var(--text-3)">'+n+' open incidents · '+d.hazard+'</span></span>' +
+           '<span class="t t-'+tone(hh)+'">'+fmtElapsedH(hh)+'</span></button>';
+  }).join('');
+  $$('#districtPopList button').forEach(b => b.onclick = () => {
+    $('#districtPop').classList.add('hidden');
+    setDistrict(b.dataset.d);
+    const d = dist(b.dataset.d);
+    S.k = 1.9; S.tx = 500 - d.cx*S.k; S.ty = 360 - d.cy*S.k; applyView();
+  });
+}
+$('#districtCounter').onclick = e => {
+  e.stopPropagation();
+  buildDistrictPop();
+  $('#districtPop').classList.toggle('hidden');
+};
+
+/* ============================================================
+   THEME — OS by default, manual override persisted across launches.
+   The palette itself is pure CSS, so switching needs no re-render:
+   the map, markers and every surface follow the token set.
+   ============================================================ */
+const THEME_KEY = 'unires.theme';
+function storedTheme(){
+  try { return localStorage.getItem(THEME_KEY) || 'light'; }
+  catch(e){ return 'light'; }           // storage blocked — light is the default
+}
+function applyTheme(choice){
+  const root = document.documentElement;
+  if (choice === 'system') root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', choice);
+  try { localStorage.setItem(THEME_KEY, choice); }   // 'system' is now stored explicitly
+  catch(e){ /* not persisted; the session still honours the choice */ }
+  syncThemeSeg();
+}
+function syncThemeSeg(){
+  const c = storedTheme();
+  $$('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.choice === c)));
+}
+$$('#themeSeg button').forEach(b => b.onclick = () => {
+  applyTheme(b.dataset.choice);
+  const osDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
+  toast(b.dataset.choice === 'system'
+    ? 'Appearance follows the operating system (currently ' + (osDark ? 'dark' : 'light') + ').'
+    : 'Appearance locked to ' + b.dataset.choice + ' for this device.');
+});
+syncThemeSeg();
+
+/* Simulated network conditions — the loading and error paths are real code,
+   so they need a way to be exercised without a server. */
+$$('#netSeg button').forEach(b => b.onclick = () => {
+  $$('#netSeg button').forEach(x => x.setAttribute('aria-pressed','false'));
+  b.setAttribute('aria-pressed','true');
+  const mode = b.dataset.net;
+  NET.failCpoc = mode === 'fail';
+  NET.latency  = mode === 'slow' ? 1600 : 240;
+  api.invalidateCpoc();                       // force the next read to hit the "network"
+  if (S.district) loadDistrictCpoc(S.district, dist(S.district));
+  refreshOpenCpocBlocks();
+  toast(mode === 'fail' ? 'Simulating CPOC lookup failure — error state and retry are live.'
+      : mode === 'slow' ? 'Simulating a slow link — skeletons will hold for ~1.6s.'
+      : 'Network back to normal.');
+});
+
+/* account menu */
+$('#acctBtn').onclick = e => {
+  e.stopPropagation();
+  const m = $('#acctMenu'), open = m.classList.toggle('hidden');
+  $('#acctBtn').setAttribute('aria-expanded', String(!open));
+};
+$$('#demoSeg button').forEach(b => b.onclick = () => {
+  $$('#demoSeg button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  S.leadH = parseFloat(b.dataset.h);
+  DISTRICTS.find(d => d.id === 'karippodu').sinceH = S.leadH;
+  tick();
+  if (S.district === 'karippodu') setDistrict('karippodu');
+  toast('Demo: longest-running emergency set to ' + fmtElapsedH(S.leadH) + '.');
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#acctMenu') && !e.target.closest('#acctBtn')) $('#acctMenu').classList.add('hidden');
+  if (!e.target.closest('#districtPop') && !e.target.closest('#districtCounter')) $('#districtPop').classList.add('hidden');
+});
+
+/* ============================================================
+   CPOC MODAL
+   ============================================================ */
+$('#btnCpoc').onclick = () => openCPOC(S.district);
+$('#dcardClose').onclick = () => setDistrict(null);
+
+function openCPOC(id, incident){
+  if (!id) return;
+  const d = dist(id);
+  $('#cpocSub').textContent = d.name + ' district · ' + d.state;
+  $('#cpocBody').innerHTML = cpocSkeleton();
+  $('#cpocScrim').classList.remove('hidden');
+
+  const req = ++_cpocModalReq;
+  const alive = () => req === _cpocModalReq && !$('#cpocScrim').classList.contains('hidden');
+
+  api.getCpoc(id).then(rec => {
+    if (!alive()) return;
+    if (!rec){ $('#cpocBody').innerHTML = cpocAbsentMarkup(d); return; }
+    paintCpocModal(rec, d, incident);
+  }).catch(() => {
+    if (!alive()) return;
+    $('#cpocBody').innerHTML = cpocErrorMarkup();
+    $('#cpocBody').querySelector('[data-act="retry"]').onclick = () => openCPOC(id, incident);
+  });
+}
+let _cpocModalReq = 0;
+
+function paintCpocModal(rec, d, incident){
+  const acting  = !rec.name;
+  const who     = rec.name || rec.deputy.name;
+  const shortWho = who.replace(/,.*/,'');
+  const initials = shortWho.split(' ').filter(w => /^[A-Za-z]/.test(w)).slice(-2).map(w => w[0]).join('').toUpperCase();
+  const phone   = rec.channels.find(c => c.kind === 'phone') || {};
+  const email   = rec.channels.find(c => c.kind === 'email') || {};
+  const net     = rec.channels.find(c => c.kind === 'net') || {};
+  const radio   = rec.channels.find(c => c.kind === 'radio') || {};
+  const canCall = !!phone.available, canMail = !!email.available, canNet = !!net.available;
+
+  $('#cpocBody').innerHTML =
+    (acting ? '<div class="notice warn" style="margin-bottom:13px">' +
+        '<svg viewBox="0 0 24 24"><path d="M12 4l9 16H3zM12 10v4M12 17.6v.01"/></svg>' +
+        '<span><b>CPOC post vacant.</b> Deputy is acting under the M1 succession chain.</span></div>' : '') +
+    '<div class="cpoc-top">' +
+      '<span class="cpoc-av">'+initials+'</span>' +
+      '<div><h4>'+who+'</h4><p>'+(acting ? rec.deputy.designation : rec.designation)+'</p>' +
+      '<span class="live" style="color:'+(rec.online?'var(--st-resolved)':'var(--st-rejected)')+'">' +
+        '<span class="pulse-dot" style="background:'+(rec.online?'var(--st-resolved)':'var(--st-rejected)')+';margin:0"></span>' +
+        (rec.online ? 'Device online · heartbeat '+rec.heartbeat
+                    : 'Unreachable '+rec.heartbeat+' — deputy standing by') +
+      '</span></div>' +
+    '</div>' +
+
+    (incident ? '<div class="notice" style="margin-bottom:12px">' +
+        '<svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 3z"/></svg>' +
+        '<span>Contacting about <b>'+incident.id+'</b> — '+incident.title+'</span></div>' : '') +
+
+    '<div class="phone"><div><div class="l">'+(canCall ? 'PRIMARY LINE' : 'PRIMARY LINE — UNREACHABLE')+'</div>' +
+      '<div class="num"'+(canCall ? '' : ' style="color:var(--text-disabled);text-decoration:line-through"')+'>'+(phone.value || '—')+'</div></div>' +
+      '<span class="agy" style="background:var(--primary-wash);border-color:var(--primary-edge);color:var(--primary-fg)">'+
+        rec.link.split(' ')[0].toUpperCase()+'</span></div>' +
+
+    '<div class="cpoc-actions">' +
+      '<button class="btn primary" id="cpocCall"'+(canCall ? '' : ' disabled title="Cellular is down in this area — use the district net"')+'>' +
+        '<svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>Call now</button>' +
+      '<button class="btn" id="cpocMsg"'+(canNet ? '' : ' disabled title="District net not reachable for this area"')+'>' +
+        '<svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 3z"/></svg>Message</button>' +
+    '</div>' +
+
+    '<div class="cpoc-kv">' +
+      '<div><span>Department</span><b>'+rec.department+'</b></div>' +
+      '<div><span>Jurisdiction</span><b>'+rec.jurisdiction+'</b></div>' +
+      '<div><span>Email</span><b'+(canMail ? '' : ' style="color:var(--text-disabled);text-decoration:line-through"')+'>'+(email.value || '—')+'</b></div>' +
+      '<div><span>Deputy CPOC</span><b>'+(acting ? '— vacant —' : rec.deputy.name) +
+        (acting || !rec.deputy.phone ? '' : '<br><span style="font-family:var(--mono);color:var(--text-2);font-weight:500">'+rec.deputy.phone+'</span>')+'</b></div>' +
+      '<div><span>Radio</span><b>'+(radio.value || '—')+'</b></div>' +
+      '<div><span>Link</span><b>'+rec.link+'</b></div>' +
+      '<div><span>Assigned</span><b>'+(rec.assignedAtMin == null ? '—' : fmtAge(rec.assignedAtMin)+' ago')+'</b></div>' +
+      '<div><span>Record updated</span><b>'+fmtAge(rec.updatedAtMin)+' ago</b></div>' +
+      '<div><span>Succession</span><b>CPOC → Deputy → senior agency lead</b></div>' +
+    '</div>' +
+
+    '<div class="msgbox hidden" id="msgBox">' +
+      '<textarea id="msgText" aria-label="Message to the CPOC">' +
+      (incident
+        ? 'Re ' + incident.id + ' (' + incident.title + '): confirm tasking and expected time on scene. Reply on ' + (net.value || 'district net') + '.'
+        : 'Confirm rescue-phase status for the 18:00 review. Report P0 count and boat availability.') +
+      '</textarea>' +
+      '<div class="msg-foot"><span class="note">Sends as P1 over the district net — delivered on next mesh drain if offline.</span>' +
+      '<button class="btn primary sm" id="msgSend">Send</button></div>' +
+    '</div>' +
+
+    '<div style="margin-top:13px;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;gap:9px">' +
+      '<span style="font-size:10.5px;color:var(--text-3);flex:1">Succession: hand the area to the deputy if this device stops answering.</span>' +
+      '<button class="btn sm" id="cpocHandover"'+(acting ? ' disabled title="No deputy designated"' : '')+'>Transfer to deputy</button>' +
+    '</div>';
+
+  if (canCall) $('#cpocCall').onclick = () => {
+    const b = $('#cpocCall');
+    b.innerHTML = 'Dialling ' + phone.value + '…'; b.disabled = true;
+    if (incident) logEvent(incident.id, 'CONTACT_CPOC', 'Call · ' + who + ' · ' + phone.value);
+    if (incident) refreshTrail(incident.id);
+    window.setTimeout(() => toast('Call placed to ' + shortWho + ' — written to the activity trail (M11).'), 600);
+  };
+  if (canNet) $('#cpocMsg').onclick = () => $('#msgBox').classList.toggle('hidden');
+  $('#cpocBody').addEventListener('click', e => {
+    if (e.target.id === 'msgSend'){
+      $('#msgBox').classList.add('hidden');
+      if (incident){ logEvent(incident.id, 'CONTACT_CPOC', 'District-net message · ' + who); refreshTrail(incident.id); }
+      toast('Message queued P1 to ' + d.name + ' net · 1 hop via NDRF gateway.');
+    }
+  });
+  if (!acting) $('#cpocHandover').onclick = () => {
+    const promoted = api.promoteDeputy(d.id);          // rewrites the record + drops the cache
+    if (!promoted) return;
+    logEvent(incident ? incident.id : '—', 'CPOC_HANDOVER', 'Area handed to ' + promoted.name);
+    toast(d.name + ' handed over — ' + promoted.name + ' is acting CPOC. Every open view refreshed.');
+    openCPOC(d.id, incident);                          // modal re-reads through the api
+    if (S.district === d.id) loadDistrictCpoc(d.id, d); // district card re-reads
+    refreshOpenCpocBlocks();                            // and any open issue detail
+  };
+}
+
+/** After a handover, repaint any CPOC block currently on screen so none can go stale. */
+function refreshOpenCpocBlocks(){
+  const host = $('#list [data-cpoc]');
+  if (!host) return;
+  const row = $('#list .row.sel');
+  const i = row ? inc(row.dataset.id) : null;
+  if (i) renderCpocBlock(host, $('#list [data-act="contact"]'), i);
+}
+
+/* ============================================================
+   PHOTO GALLERY + LIGHTBOX
+   ============================================================ */
+$('#btnPhotos').onclick = () => openGallery(S.district);
+
+function openGallery(id, incidentId){
+  if (!id) return;
+  const d = dist(id);
+  let set = (PHOTOS[id] || []).slice();
+  if (incidentId) set = set.filter(p => p.inc === incidentId).concat(set.filter(p => p.inc !== incidentId));
+  S.photoSet = set; S.photoDistrict = id;
+  $('#galTitle').textContent = 'Photo evidence — ' + d.name;
+  $('#galSub').textContent = set.length
+    ? set.length + ' geotagged captures · locked in-app camera · gallery upload disabled · hashes verified on sync'
+    : 'No evidence uploaded from this district yet';
+  const body = $('#galBody');
+  body.innerHTML = set.length ? '<div class="gal">' + set.map((p,ix) =>
+    '<button class="shot" data-i="'+ix+'">' +
+      '<div class="img">' + sceneSVG(p.scene, ix) +
+        '<span class="badge">'+p.agency+' · '+p.unit+'</span>' +
+        '<span class="vf">&#10003; signed</span>' +
+      '</div>' +
+      '<div class="cap">' +
+        '<div class="t">'+p.t+'</div>' +
+        '<div class="c">'+p.ll+' · '+p.acc+'</div>' +
+        '<div class="u"><span class="agy" style="font-size:9px">'+p.inc+'</span>'+p.note+'</div>' +
+      '</div>' +
+    '</button>').join('') + '</div>'
+    : '<div class="empty">No photo evidence has been uploaded from ' + d.name + '.<br>Captures appear here the moment a responder device syncs — thumbnails first, full resolution last.</div>';
+  body.querySelectorAll('.shot').forEach(b => b.onclick = () => openLightbox(+b.dataset.i));
+  $('#galScrim').classList.remove('hidden');
+}
+
+function openLightbox(ix){
+  S.photoIdx = ix;
+  const p = S.photoSet[ix], d = dist(S.photoDistrict);
+  let canvas = $('#lbCanvas');
+  if (!canvas){
+    canvas = document.createElement('div');
+    canvas.id = 'lbCanvas';
+    
+    $('#lbImg').prepend(canvas);
+  }
+  canvas.innerHTML = sceneSVG(p.scene, ix);
+  $('#lbTitle').textContent = p.note;
+  $('#lbSub').textContent = d.name + ' · photo ' + (ix+1) + ' of ' + S.photoSet.length;
+  $('#lbMeta').innerHTML =
+    '<h5>Capture metadata</h5>' +
+    '<div class="kv"><span>Incident</span><b>'+p.inc+'</b></div>' +
+    '<div class="kv"><span>Captured</span><b>'+p.t+'</b></div>' +
+    '<div class="kv"><span>Coordinates</span><b>'+p.ll+'</b></div>' +
+    '<div class="kv"><span>GPS accuracy</span><b>'+p.acc+'</b></div>' +
+    '<div class="kv"><span>Unit</span><b>'+p.unit+'</b></div>' +
+    '<div class="kv"><span>Agency</span><b>'+p.agency+'</b></div>' +
+    '<div class="kv"><span>District</span><b>'+d.name+'</b></div>' +
+    '<div class="kv"><span>Payload hash</span><b>'+p.hash+'</b></div>' +
+    '<div class="kv"><span>Geo-fence</span><b style="color:var(--st-resolved)">within tolerance</b></div>' +
+    '<div class="chain">Captured in-app and signed with the device key at capture time. Timestamp is the original device time, not the sync time — any later alteration breaks the hash.</div>' +
+    '<div style="display:flex;gap:7px;margin-top:13px">' +
+      '<button class="btn sm" style="flex:1" onclick="toast(\'Marked for CPOC verification queue.\')">Send to verify</button>' +
+      '<button class="btn sm" style="flex:1" onclick="toast(\'Full-resolution copy requested — queued P4 behind live traffic.\')">Full res</button>' +
+    '</div>';
+  $('#lightbox').classList.remove('hidden');
+}
+$('#lbPrev').onclick = () => openLightbox((S.photoIdx - 1 + S.photoSet.length) % S.photoSet.length);
+$('#lbNext').onclick = () => openLightbox((S.photoIdx + 1) % S.photoSet.length);
+$$('[data-close]').forEach(b => b.onclick = () => $('#'+b.dataset.close).classList.add('hidden'));
+$$('.scrim').forEach(s => s.onclick = e => { if (e.target === s) s.classList.add('hidden'); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape'){
+    if (!$('#lightbox').classList.contains('hidden')) return $('#lightbox').classList.add('hidden');
+    if (!$('#galScrim').classList.contains('hidden'))  return $('#galScrim').classList.add('hidden');
+    if (!$('#cpocScrim').classList.contains('hidden')) return $('#cpocScrim').classList.add('hidden');
+    $('#acctMenu').classList.add('hidden'); $('#districtPop').classList.add('hidden');
+    clearSelection(); renderIncidents(); renderList(); renderCallout();
+  }
+  if (!$('#lightbox').classList.contains('hidden')){
+    if (e.key === 'ArrowLeft') $('#lbPrev').click();
+    if (e.key === 'ArrowRight') $('#lbNext').click();
+  }
+});
+
+/* ============================================================
+   SYNTHETIC PHOTO SCENES (stand-ins for real geotagged captures)
+   ============================================================ */
+let __uid = 0;
+function sceneSVG(kind, ix){
+  const u = 'p' + (++__uid);
+  const j = ((ix||0) % 3) * 9;                       // small per-photo variation
+  const open = '<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">';
+  const grain = '<rect width="400" height="300" fill="url(#vg'+u+')"/>' +
+    '<defs><radialGradient id="vg'+u+'" cx=".5" cy=".45" r=".78">' +
+    '<stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></radialGradient></defs>';
+
+  if (kind === 'flood') return open +
+    '<defs><linearGradient id="s'+u+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4E6070"/><stop offset="1" stop-color="#93A4B0"/></linearGradient>' +
+    '<linearGradient id="w'+u+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#71806F"/><stop offset="1" stop-color="#3A4540"/></linearGradient></defs>' +
+    '<rect width="400" height="300" fill="url(#s'+u+')"/>' +
+    '<g fill="#2B3641"><rect x="'+(10+j)+'" y="106" width="54" height="46"/><rect x="'+(74+j)+'" y="86" width="40" height="66"/>' +
+    '<rect x="126" y="114" width="68" height="38"/><rect x="206" y="94" width="46" height="58"/>' +
+    '<rect x="264" y="120" width="56" height="32"/><rect x="330" y="100" width="58" height="52"/></g>' +
+    '<g fill="#3E4C58"><rect x="82" y="96" width="8" height="9"/><rect x="96" y="96" width="8" height="9"/><rect x="216" y="104" width="9" height="10"/><rect x="232" y="104" width="9" height="10"/><rect x="344" y="112" width="10" height="10"/></g>' +
+    '<rect y="152" width="400" height="148" fill="url(#w'+u+')"/>' +
+    '<path d="M28 196 L74 164 L120 196 Z" fill="#33404B"/><path d="M244 214 L288 180 L332 214 Z" fill="#2E3A45"/>' +
+    '<g stroke="#B9CAD2" stroke-opacity=".24" stroke-width="2.4" stroke-linecap="round">' +
+    '<path d="M4 172h124M168 176h84M36 202h122M232 208h150M14 236h176M236 252h144M60 274h130"/></g>' +
+    '<g fill="#2C3A34"><ellipse cx="150" cy="230" rx="20" ry="5"/><ellipse cx="320" cy="270" rx="26" ry="6"/><ellipse cx="70" cy="258" rx="14" ry="4"/></g>' +
+    '<g stroke="#D3E1EA" stroke-opacity=".18" stroke-width="1.3"><path d="M30 0l-12 60M110 10l-12 60M190 0l-12 70M270 14l-12 58M350 0l-12 66M70 40l-10 50M230 44l-10 46"/></g>' +
+    grain + '</svg>';
+
+  if (kind === 'collapse') return open +
+    '<defs><linearGradient id="s'+u+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#77838E"/><stop offset="1" stop-color="#AEB7BF"/></linearGradient></defs>' +
+    '<rect width="400" height="300" fill="url(#s'+u+')"/>' +
+    '<rect y="206" width="400" height="94" fill="#4B5057"/>' +
+    '<path d="M0 206 L96 206 L96 84 L20 84 L20 206 Z" fill="#3A4048"/>' +
+    '<path d="M'+(96+j)+' 206 L96 120 L188 96 L206 206 Z" fill="#464C54"/>' +
+    '<path d="M206 206 L214 132 L300 152 L296 206 Z" fill="#383E45"/>' +
+    '<path d="M300 206 L304 108 L392 88 L400 206 Z" fill="#434951"/>' +
+    '<g fill="#2E343B"><path d="M120 206 L176 168 L232 206 Z"/><path d="M232 206 L268 184 L306 206 Z"/><path d="M40 214 L92 190 L142 214 Z"/></g>' +
+    '<g fill="#565C64"><path d="M150 214 L184 196 L214 214 Z"/><path d="M254 220 L288 202 L320 220 Z"/></g>' +
+    '<g stroke="#71787F" stroke-width="2.2" stroke-linecap="round"><path d="M168 178l14-22M186 176l10-26M256 190l12-18M118 200l-14-18"/></g>' +
+    '<g fill="#FFFFFF" fill-opacity=".10"><ellipse cx="196" cy="150" rx="96" ry="46"/><ellipse cx="300" cy="168" rx="70" ry="34"/></g>' +
+    '<g fill="#2A3037"><rect x="0" y="252" width="400" height="10" opacity=".5"/></g>' +
+    grain + '</svg>';
+
+  if (kind === 'fire') return open +
+    '<rect width="400" height="300" fill="#150F0C"/>' +
+    '<defs><radialGradient id="g'+u+'" cx=".55" cy=".72" r=".62">' +
+    '<stop offset="0" stop-color="#FF9A3C" stop-opacity=".85"/><stop offset=".55" stop-color="#C2451A" stop-opacity=".38"/><stop offset="1" stop-color="#150F0C" stop-opacity="0"/></radialGradient></defs>' +
+    '<rect width="400" height="300" fill="url(#g'+u+')"/>' +
+    '<g fill="#0E0A08"><rect x="0" y="150" width="86" height="150"/><rect x="96" y="122" width="70" height="178"/>' +
+    '<rect x="248" y="138" width="64" height="162"/><rect x="322" y="118" width="78" height="182"/></g>' +
+    '<rect x="176" y="176" width="64" height="124" fill="#120C09"/>' +
+    '<g fill="#E8641C"><path d="M'+(198+j)+' 260c-4-22 10-34 12-52 4 14 16 20 18 38 2 16-8 28-18 28s-10-8-12-14z"/>' +
+    '<path d="M162 268c-3-16 8-24 9-38 3 10 12 15 13 28 2 12-6 21-13 21s-8-6-9-11z"/></g>' +
+    '<g fill="#FFC24D"><path d="M'+(206+j)+' 262c-2-12 6-18 7-28 2 8 9 11 10 21 1 9-5 15-10 15s-6-4-7-8z"/>' +
+    '<path d="M168 272c-2-8 4-12 5-19 1 6 6 8 7 14 1 6-4 11-7 11s-5-3-5-6z"/></g>' +
+    '<g fill="#241C18" opacity=".85"><circle cx="200" cy="118" r="40"/><circle cx="250" cy="96" r="30"/><circle cx="152" cy="92" r="26"/><circle cx="300" cy="70" r="34"/></g>' +
+    '<g stroke="#3A2B22" stroke-width="2"><path d="M0 150h400M0 214h176M240 214h160"/></g>' +
+    grain + '</svg>';
+
+  if (kind === 'road') return open +
+    '<defs><linearGradient id="s'+u+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8CA0AE"/><stop offset="1" stop-color="#C3CDD4"/></linearGradient></defs>' +
+    '<rect width="400" height="300" fill="url(#s'+u+')"/>' +
+    '<path d="M0 132 L120 66 L232 108 L330 62 L400 96 L400 300 L0 300 Z" fill="#4F6146"/>' +
+    '<path d="M120 66 L232 108 L214 300 L96 300 Z" fill="#6A5A44"/>' +
+    '<path d="M'+(130+j)+' 78 L206 112 L196 300 L120 300 Z" fill="#7E6B50"/>' +
+    '<path d="M0 214 L400 178 L400 246 L0 286 Z" fill="#3C4147"/>' +
+    '<g stroke="#D8D3B4" stroke-width="4" stroke-dasharray="26 22"><path d="M0 250 L400 212"/></g>' +
+    '<g fill="#5D4F3C"><ellipse cx="150" cy="238" rx="58" ry="26"/><ellipse cx="214" cy="256" rx="40" ry="18"/><ellipse cx="96" cy="226" rx="30" ry="14"/></g>' +
+    '<g fill="#6E5F49"><ellipse cx="140" cy="228" rx="20" ry="10"/><ellipse cx="196" cy="248" rx="15" ry="8"/></g>' +
+    '<g fill="#D9432F"><rect x="300" y="196" width="9" height="34" rx="2"/><rect x="356" y="188" width="9" height="34" rx="2"/></g>' +
+    '<rect x="296" y="188" width="74" height="9" rx="3" fill="#E8E2CE"/>' +
+    '<g stroke="#3C4147" stroke-width="2.4"><path d="M0 286 L400 246"/></g>' +
+    grain + '</svg>';
+
+  if (kind === 'camp') return open +
+    '<defs><linearGradient id="s'+u+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7E90A0"/><stop offset="1" stop-color="#BCC6CD"/></linearGradient></defs>' +
+    '<rect width="400" height="300" fill="url(#s'+u+')"/>' +
+    '<rect y="150" width="400" height="150" fill="#5A5B46"/>' +
+    '<rect y="150" width="400" height="16" fill="#6B6C54"/>' +
+    '<g fill="#D6D8C2"><path d="M'+(20+j)+' 214 L58 150 L96 214 Z"/><path d="M116 214 L154 150 L192 214 Z"/><path d="M212 214 L250 150 L288 214 Z"/><path d="M308 214 L346 150 L384 214 Z"/></g>' +
+    '<g fill="#A9AC91"><path d="M58 150 L96 214 L78 214 Z"/><path d="M154 150 L192 214 L174 214 Z"/><path d="M250 150 L288 214 L270 214 Z"/><path d="M346 150 L384 214 L366 214 Z"/></g>' +
+    '<g fill="#8E9179"><path d="M46 214 L58 178 L70 214 Z"/><path d="M142 214 L154 178 L166 214 Z"/><path d="M238 214 L250 178 L262 214 Z"/><path d="M334 214 L346 178 L358 214 Z"/></g>' +
+    '<g fill="#4A4B3A"><rect x="0" y="240" width="400" height="60"/></g>' +
+    '<g fill="#2E3A45"><rect x="24" y="248" width="86" height="34" rx="4"/><rect x="96" y="256" width="34" height="26" rx="3"/></g>' +
+    '<g fill="#1F2731"><circle cx="46" cy="284" r="9"/><circle cx="96" cy="284" r="9"/></g>' +
+    '<g fill="#39413A"><ellipse cx="220" cy="272" rx="10" ry="16"/><ellipse cx="248" cy="276" rx="9" ry="14"/><ellipse cx="300" cy="270" rx="11" ry="17"/></g>' +
+    grain + '</svg>';
+
+  /* night */
+  return open +
+    '<rect width="400" height="300" fill="#080C12"/>' +
+    '<defs><linearGradient id="t'+u+'" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE9A8" stop-opacity=".22"/><stop offset="1" stop-color="#FFE9A8" stop-opacity="0"/></linearGradient></defs>' +
+    '<path d="M'+(40+j)+' 24 L150 300 L58 300 Z" fill="url(#t'+u+')"/>' +
+    '<circle cx="'+(40+j)+'" cy="22" r="7" fill="#FFF3C9" opacity=".9"/>' +
+    '<rect y="228" width="400" height="72" fill="#0C1219"/>' +
+    '<g fill="#04070B"><path d="M96 228 L120 186 L146 228 Z"/><path d="M240 228 L272 176 L306 228 Z"/><rect x="326" y="182" width="58" height="46"/></g>' +
+    '<g fill="#0A0F16"><ellipse cx="150" cy="262" rx="46" ry="12"/><ellipse cx="290" cy="278" rx="60" ry="14"/></g>' +
+    '<g fill="#050A10"><path d="M138 258 a7 7 0 1 1 14 0 v18 h-14 z"/><path d="M166 264 a6 6 0 1 1 12 0 v14 h-12 z"/></g>' +
+    '<g stroke="#9FB6C6" stroke-opacity=".22" stroke-width="1.2"><path d="M20 0l-10 54M92 12l-10 52M164 0l-10 60M236 16l-10 50M308 0l-10 58M372 20l-10 48M56 40l-8 44M270 48l-8 40"/></g>' +
+    '<circle cx="352" cy="196" r="4" fill="#7FD8A6" opacity=".85"/>' +
+    grain + '</svg>';
+}
+
+
+/* ============================================================
+   ASSIGNED AGENCIES  (Finding 3)
+   Assignments ride on the incident from the list endpoint, so
+   both the card and the detail render from data already in hand.
+   ============================================================ */
+const AGENCY_LABEL = { NDRF:'NDRF', SDRF:'SDRF', FIRE:'Fire Force', POLICE:'Police', MEDICAL:'Medical' };
+const leadOf     = i => (i.assignments || []).find(a => a.role === 'lead') || (i.assignments || [])[0] || null;
+const agenciesOf = i => (i.assignments || []).map(a => a.agency);
+
+function assignSummary(i){
+  const as = i.assignments || [];
+  if (!as.length) return 'No agency assigned yet';
+  return as.map(a => (a.unit || AGENCY_LABEL[a.agency]) + ' — ' + a.role).join('; ');
+}
+
+/** Compact indicator for the list card: lead + overflow count, never a wall of chips. */
+function agencyCell(i){
+  const as = i.assignments || [], lead = leadOf(i);
+  if (!lead) return '<span class="agy-cell"><span class="agy none">UNASSIGNED</span></span>';
+  const extra = as.length - 1;
+  return '<span class="agy-cell" role="group" aria-label="Assigned: ' + assignSummary(i) + '">' +
+    '<span class="agy lead">' + (lead.unit || AGENCY_LABEL[lead.agency]) + '</span>' +
+    (extra > 0 ? '<span class="agy more" aria-hidden="true">+' + extra + '</span>' : '') +
+  '</span>';
+}
+
+/** Full list with role per agency, for the detail. */
+function assignBlock(i){
+  const as = i.assignments || [];
+  if (!as.length){
+    return '<div class="notice">' +
+      '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16v.01"/></svg>' +
+      '<span><b>Not yet assigned.</b> No agency has been tasked to this issue. ' +
+      'Tasking is the CPOC’s call — contact them below or assign a unit.</span></div>';
+  }
+  return '<div class="assign">' + as.map(a =>
+    '<div class="assign-row">' +
+      '<span class="agy' + (a.role === 'lead' ? ' lead' : '') + '">' + (a.unit || AGENCY_LABEL[a.agency]) + '</span>' +
+      '<span>' + AGENCY_LABEL[a.agency] + '</span>' +
+      '<span class="when">' + fmtAge(a.agoMin) + ' ago</span>' +
+      '<span class="role' + (a.role === 'lead' ? ' lead' : '') + '">' + a.role + '</span>' +
+    '</div>').join('') + '</div>';
+}
+
+/* ============================================================
+   CPOC BLOCK  (Findings 1 + 2)
+   States handled: loading · error · absent · partial · full.
+   A stale response can never paint over a newer selection.
+   ============================================================ */
+let _cpocReq = 0;
+
+const CHAN_ICON = {
+  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+  email:'<path d="M3 6h18v12H3zM3 6l9 7 9-7"/>',
+  net:'<path d="M4 5h16v11H8l-4 3z"/>',
+  radio:'<path d="M4 10h16v9H4zM7 14h.01M17 7l-8 3"/>'
+};
+const chanIcon = k => '<svg viewBox="0 0 24 24">' + (CHAN_ICON[k] || CHAN_ICON.net) + '</svg>';
+
+function cpocSkeleton(){
+  return '<div class="cpoc-b" aria-hidden="true">' +
+    '<div class="cpoc-id"><div class="sk sk-av"></div>' +
+    '<div style="flex:1"><div class="sk sk-row w60"></div><div class="sk sk-row w80"></div>' +
+    '<div class="sk sk-row w40" style="margin-bottom:0"></div></div></div>' +
+    '<div class="sk sk-row w80"></div></div>';
+}
+function cpocErrorMarkup(){
+  return '<div class="err">' +
+    '<svg viewBox="0 0 24 24"><path d="M12 8v5M12 16v.01"/><circle cx="12" cy="12" r="9"/></svg>' +
+    '<span>CPOC lookup failed. The area record could not be reached.</span>' +
+    '<button class="btn sm" data-act="retry">Retry</button></div>';
+}
+function cpocAbsentMarkup(d){
+  return '<div class="notice">' +
+    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16v.01"/></svg>' +
+    '<span><b>Not yet assigned.</b> No CPOC is designated for ' + d.name + '. ' +
+    'An area must have one before it can enter ALERT (M1) — raise it with the Command Centre.</span></div>';
+}
+
+function cpocMarkup(rec, d){
+  const acting = !rec.name;                       // post vacant -> deputy is acting
+  const who    = rec.name || rec.deputy.name;
+  const init   = who.replace(/,.*/,'').split(' ').filter(w => /^[A-Za-z]/.test(w)).slice(-2).map(w => w[0]).join('').toUpperCase();
+  const chans  = rec.channels.map(c =>
+    '<span class="chan-tag' + (c.available ? '' : ' off') + '"' +
+      (c.available ? '' : ' title="Unavailable: ' + rec.link + '"') + '>' +
+      chanIcon(c.kind) + c.label + '</span>').join('');
+
+  return '<div class="cpoc-b">' +
+    (acting ? '<div class="notice warn">' +
+        '<svg viewBox="0 0 24 24"><path d="M12 4l9 16H3zM12 10v4M12 17.6v.01"/></svg>' +
+        '<span><b>CPOC post vacant.</b> The deputy is acting for this area under the M1 succession chain.</span></div>' : '') +
+    '<div class="cpoc-id">' +
+      '<span class="cpoc-mono">' + init + '</span>' +
+      '<div style="min-width:0">' +
+        '<div class="nm">' + who + '</div>' +
+        '<div class="de">' + (acting ? rec.deputy.designation : rec.designation) + '</div>' +
+        '<div class="dep">' + rec.department + '</div>' +
+        '<div class="cpoc-live ' + (rec.online ? 'on' : 'off') + '">' +
+          '<span class="stat-dot"></span>' +
+          (rec.online ? 'Device online · heartbeat ' + rec.heartbeat
+                      : 'Unreachable ' + rec.heartbeat + ' · ' + rec.link) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="cpoc-kv">' +
+      '<div><span>Jurisdiction</span><b>' + rec.jurisdiction + '</b></div>' +
+      '<div><span>Deputy</span><b>' + (acting ? '— vacant —' : rec.deputy.name) + '</b></div>' +
+      '<div><span>Assigned</span><b class="mono">' + (rec.assignedAtMin == null ? '—' : fmtAge(rec.assignedAtMin) + ' ago') + '</b></div>' +
+      '<div><span>Record updated</span><b class="mono">' + fmtAge(rec.updatedAtMin) + ' ago</b></div>' +
+    '</div>' +
+    '<div class="chan-list">' + chans + '</div>' +
+  '</div>';
+}
+
+/**
+ * Fills the CPOC section of an issue detail and wires its Contact action.
+ * @param {HTMLElement} host section to paint
+ * @param {HTMLElement} btn  the "Contact CPOC" primary action, enabled only on success
+ */
+function renderCpocBlock(host, btn, incident){
+  const d = dist(incident.district);
+  const req = ++_cpocReq;
+  const alive = () => req === _cpocReq && host.isConnected;
+
+  host.innerHTML = cpocSkeleton();
+  if (btn){ btn.disabled = true; btn.setAttribute('aria-busy','true'); btn.title = 'Looking up the area CPOC…'; }
+
+  api.getCpoc(incident.district).then(rec => {
+    if (!alive()) return;                                  // a newer selection won
+    host.innerHTML = rec ? cpocMarkup(rec, d) : cpocAbsentMarkup(d);
+    if (!btn) return;
+    btn.removeAttribute('aria-busy');
+    const reachable = rec ? rec.channels.filter(c => c.available && c.kind !== 'radio') : [];
+    if (!rec){
+      btn.disabled = true;
+      btn.title = 'No CPOC is designated for ' + d.name;
+    } else if (!reachable.length){
+      btn.disabled = true;
+      btn.title = 'No channel is currently reachable (' + rec.link + ')';
+    } else {
+      btn.disabled = false;
+      btn.title = 'Contact ' + (rec.name || rec.deputy.name);
+      btn.onclick = () => openChannels(rec, incident);
+    }
+  }).catch(() => {
+    if (!alive()) return;
+    host.innerHTML = cpocErrorMarkup();
+    host.querySelector('[data-act="retry"]').onclick = () => renderCpocBlock(host, btn, incident);
+    if (btn){ btn.disabled = true; btn.removeAttribute('aria-busy'); btn.title = 'CPOC lookup failed'; }
+  });
+}
+
+/* ---------- contact channel chooser ---------- */
+function mailBody(rec, i){
+  const d = dist(i.district);
+  return 'Ref: ' + i.id + ' — ' + i.title + '\n' +
+    'Area: ' + d.name + ' (' + d.state + ')\n' +
+    'Severity: P' + i.sev + ' · Status: ' + STATUS[i.status].label + '\n' +
+    'Location: ' + i.ll + '\n' +
+    'Reported: ' + fmtAge(ageMinOf(i)) + ' ago\n' +
+    'Assigned: ' + assignSummary(i) + '\n\n' +
+    'Raised from the UNIRES Command Centre by D. Krishnankutty, State Controller.\n';
+}
+
+function openChannels(rec, i){
+  const who = rec.name || rec.deputy.name;
+  const list = rec.channels.filter(c => c.available && c.kind !== 'radio');
+  $('#chanSub').textContent = who + ' · ' + dist(i.district).name + ' · re ' + i.id;
+  $('#chanBody').innerHTML = list.map(c => {
+    const isMail = c.kind === 'email';
+    const href = c.kind === 'phone' ? 'tel:' + c.value.replace(/\s/g,'')
+               : isMail ? 'mailto:' + c.value +
+                   '?subject=' + encodeURIComponent('[' + i.id + '] ' + i.title) +
+                   '&body=' + encodeURIComponent(mailBody(rec, i))
+               : null;
+    const inner =
+      '<span class="chan-ic">' + chanIcon(c.kind) + '</span>' +
+      '<span><span class="nm">' + (c.kind === 'phone' ? 'Call' : isMail ? 'Email' : 'Message on district net') + '</span>' +
+      '<span class="vl">' + c.value + '</span></span>' +
+      '<span class="go" aria-hidden="true">&rsaquo;</span>';
+    return href
+      ? '<a class="chan-opt" href="' + href + '" data-kind="' + c.kind + '" data-val="' + c.value + '">' + inner + '</a>'
+      : '<button class="chan-opt" data-kind="' + c.kind + '" data-val="' + c.value + '">' + inner + '</button>';
+  }).join('') +
+    '<div style="margin-top:11px;font-size:10.5px;color:var(--text-3);line-height:1.5">' +
+      'Radio remains available on ' + (rec.channels.find(c => c.kind === 'radio') || {}).value +
+      ' — patched from the console, not from this app. Every attempt is written to the activity trail.' +
+    '</div>';
+
+  $$('#chanBody .chan-opt').forEach(node => node.addEventListener('click', () => {
+    const kind = node.dataset.kind, val = node.dataset.val;
+    const label = kind === 'phone' ? 'Call' : kind === 'email' ? 'Email' : 'District-net message';
+    logEvent(i.id, 'CONTACT_CPOC', label + ' · ' + who + ' · ' + val);
+    refreshTrail(i.id);
+    $('#chanScrim').classList.add('hidden');
+    if (kind === 'net'){
+      openCPOC(i.district, i);                              // in-app composer, prefilled
+    } else {
+      toast(label + ' to ' + who + ' opened for ' + i.id + ' — logged to the activity trail.');
+    }
+  }));
+  $('#chanScrim').classList.remove('hidden');
+}
+
+/* ---------- activity trail (M11 stub) ---------- */
+function trailInner(id){
+  const rows = auditFor(id);
+  if (!rows.length) return '';
+  return '<div class="sec-hd"><span class="lbl">Activity</span></div>' +
+    '<div class="trail">' + rows.map(e =>
+      '<div><span class="t">' + new Date(e.at).toTimeString().slice(0,5) + '</span>' +
+      '<span>' + e.detail + ' — ' + e.actor + '</span></div>').join('') + '</div>';
+}
+function refreshTrail(id){
+  const host = $('#list [data-trail="' + id + '"]');
+  if (!host) return;
+  const inner = trailInner(id);
+  host.innerHTML = inner;
+  host.classList.toggle('hidden', !inner);
+}
+
+/* ============================================================
+   HEADER STATS + INIT
+   ============================================================ */
+function renderSevRow(){
+  const open = INCIDENTS.filter(isOpen);
+  $('#sevRow').innerHTML = [0,1,2,3].map(s =>
+    '<span class="sevcount fg-s'+s+'"><i class="bg-s'+s+'"></i>'+
+    open.filter(i => i.sev === s).length+'</span>').join('');
+  const eng = UNITS.filter(u => u.state === 'ENGAGED').length;
+  const en  = UNITS.filter(u => u.state === 'EN_ROUTE').length;
+  const av  = UNITS.filter(u => u.state === 'AVAILABLE').length;
+  $('#unitStat').textContent = UNITS.length;
+  $('#unitSub').textContent = eng + ' engaged · ' + en + ' en route · ' + av + ' staging';
+}
+
+buildFilters();
+renderDistricts();
+renderUnits();
+renderIncidents();
+renderList();
+renderSevRow();
+applyView();
+tick();
+setInterval(tick, 1000);
+setInterval(() => { renderList(); renderIncidents(); }, 60000);
+
+/* Opens on the whole-state view; district actions appear on selection. */
+setTimeout(() => toast('Select any district on the map for its CPOC line and uploaded photo evidence.', 6000), 900);
+</script>
+</body>
+</html>

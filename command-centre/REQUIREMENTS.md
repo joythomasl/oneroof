@@ -4,6 +4,7 @@ This file describes the minimum environment required to run and test this checkp
 
 ## Required software
 
+
 - Node.js 20 LTS or newer (Node.js 18 is the minimum supported baseline)
 - npm 9 or newer
 - A current Chrome, Edge, or Firefox browser
